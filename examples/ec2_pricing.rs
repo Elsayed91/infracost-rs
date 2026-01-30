@@ -23,7 +23,10 @@ async fn main() -> Result<(), infracost::Error> {
         .fetch()
         .await?;
 
-    println!("Found {} products for t3.micro Linux in us-east-1:\n", products.len());
+    println!(
+        "Found {} products for t3.micro Linux in us-east-1:\n",
+        products.len()
+    );
 
     for product in &products {
         println!("SKU: {}", product.sku);

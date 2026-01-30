@@ -363,7 +363,6 @@ impl MockProduct {
     }
 }
 
-
 // JSON deserialization types
 #[derive(serde::Deserialize)]
 struct MockJsonData {
@@ -434,7 +433,10 @@ mod tests {
     #[tokio::test]
     async fn test_mock_client_empty() {
         let client = MockClient::empty();
-        let products = client.query_products(ProductFilter::default()).await.unwrap();
+        let products = client
+            .query_products(ProductFilter::default())
+            .await
+            .unwrap();
         assert!(products.is_empty());
     }
 
@@ -449,11 +451,7 @@ mod tests {
             .build();
 
         let products = client
-            .query_products(
-                ProductFilter::builder()
-                    .vendor("gcp")
-                    .build(),
-            )
+            .query_products(ProductFilter::builder().vendor("gcp").build())
             .await
             .unwrap();
 
@@ -465,8 +463,22 @@ mod tests {
     #[tokio::test]
     async fn test_mock_client_from_prices() {
         let client = MockClient::from_prices(&[
-            ("gcp", "Compute Engine", "us-central1", "pd-ssd", 0.170, "GB-month"),
-            ("gcp", "Compute Engine", "us-east1", "pd-ssd", 0.170, "GB-month"),
+            (
+                "gcp",
+                "Compute Engine",
+                "us-central1",
+                "pd-ssd",
+                0.170,
+                "GB-month",
+            ),
+            (
+                "gcp",
+                "Compute Engine",
+                "us-east1",
+                "pd-ssd",
+                0.170,
+                "GB-month",
+            ),
             ("aws", "AmazonEC2", "us-east-1", "t3.micro", 0.0104, "Hrs"),
         ]);
 
@@ -505,32 +517,33 @@ mod tests {
             .unwrap();
 
         assert_eq!(products.len(), 1);
-        assert_eq!(products[0].attribute("description"), Some("SSD backed PD Capacity"));
+        assert_eq!(
+            products[0].attribute("description"),
+            Some("SSD backed PD Capacity")
+        );
     }
 
     #[tokio::test]
     async fn test_mock_client_with_callback() {
-        let client = MockClient::with_callback(|filter| {
-            match filter.region.as_deref() {
-                Some("us-central1") => vec![Product {
-                    product_hash: "cb-1".to_string(),
-                    vendor_name: "gcp".to_string(),
-                    service: "Compute Engine".to_string(),
-                    product_family: None,
-                    region: Some("us-central1".to_string()),
-                    sku: "pd-ssd".to_string(),
-                    attributes: vec![],
-                    prices: vec![Price {
-                        usd: "0.170".to_string(),
-                        unit: "GB-month".to_string(),
-                        description: None,
-                        purchase_option: None,
-                        start_usage_amount: None,
-                        end_usage_amount: None,
-                    }],
+        let client = MockClient::with_callback(|filter| match filter.region.as_deref() {
+            Some("us-central1") => vec![Product {
+                product_hash: "cb-1".to_string(),
+                vendor_name: "gcp".to_string(),
+                service: "Compute Engine".to_string(),
+                product_family: None,
+                region: Some("us-central1".to_string()),
+                sku: "pd-ssd".to_string(),
+                attributes: vec![],
+                prices: vec![Price {
+                    usd: "0.170".to_string(),
+                    unit: "GB-month".to_string(),
+                    description: None,
+                    purchase_option: None,
+                    start_usage_amount: None,
+                    end_usage_amount: None,
                 }],
-                _ => vec![],
-            }
+            }],
+            _ => vec![],
         });
 
         let products = client

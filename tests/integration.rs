@@ -92,7 +92,10 @@ async fn test_query_with_regex() {
         .await
         .expect("Query should succeed");
 
-    assert!(!products.is_empty(), "Should find products with regex match");
+    assert!(
+        !products.is_empty(),
+        "Should find products with regex match"
+    );
 }
 
 #[tokio::test]

@@ -83,9 +83,30 @@ async fn test_mock_client_filtering() {
 #[tokio::test]
 async fn test_mock_client_from_prices() {
     let client = MockClient::from_prices(&[
-        ("gcp", "Compute Engine", "us-central1", "pd-ssd", 0.170, "GB-month"),
-        ("gcp", "Compute Engine", "us-east1", "pd-ssd", 0.170, "GB-month"),
-        ("gcp", "Compute Engine", "europe-west1", "pd-ssd", 0.187, "GB-month"),
+        (
+            "gcp",
+            "Compute Engine",
+            "us-central1",
+            "pd-ssd",
+            0.170,
+            "GB-month",
+        ),
+        (
+            "gcp",
+            "Compute Engine",
+            "us-east1",
+            "pd-ssd",
+            0.170,
+            "GB-month",
+        ),
+        (
+            "gcp",
+            "Compute Engine",
+            "europe-west1",
+            "pd-ssd",
+            0.187,
+            "GB-month",
+        ),
         ("aws", "AmazonEC2", "us-east-1", "t3.micro", 0.0104, "Hrs"),
     ]);
 
@@ -213,7 +234,10 @@ async fn test_mock_client_attributes() {
         .unwrap();
 
     let product = &products[0];
-    assert_eq!(product.attribute("description"), Some("SSD backed PD Capacity"));
+    assert_eq!(
+        product.attribute("description"),
+        Some("SSD backed PD Capacity")
+    );
     assert_eq!(product.attribute("storageType"), Some("pd-ssd"));
     assert_eq!(product.attribute("nonexistent"), None);
 }
@@ -240,8 +264,18 @@ async fn test_price_filter() {
         .with_product(
             MockProduct::new("gcp", "Compute Engine", "us-central1")
                 .sku("n1-standard-1")
-                .price_full(0.0475, "Hrs", Some("On-demand".into()), Some("on_demand".into()))
-                .price_full(0.0142, "Hrs", Some("Preemptible".into()), Some("preemptible".into())),
+                .price_full(
+                    0.0475,
+                    "Hrs",
+                    Some("On-demand".into()),
+                    Some("on_demand".into()),
+                )
+                .price_full(
+                    0.0142,
+                    "Hrs",
+                    Some("Preemptible".into()),
+                    Some("preemptible".into()),
+                ),
         )
         .build();
 
@@ -256,9 +290,17 @@ async fn test_price_filter() {
     assert_eq!(product.prices.len(), 2);
 
     // Filter by purchase option
-    let on_demand = product.prices().purchase_option("on_demand").first().unwrap();
+    let on_demand = product
+        .prices()
+        .purchase_option("on_demand")
+        .first()
+        .unwrap();
     assert!((on_demand.usd_f64().unwrap() - 0.0475).abs() < 0.001);
 
-    let preemptible = product.prices().purchase_option("preemptible").first().unwrap();
+    let preemptible = product
+        .prices()
+        .purchase_option("preemptible")
+        .first()
+        .unwrap();
     assert!((preemptible.usd_f64().unwrap() - 0.0142).abs() < 0.001);
 }

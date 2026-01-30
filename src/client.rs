@@ -194,7 +194,10 @@ impl Client {
             .http
             .post(&self.inner.endpoint)
             .header("X-Api-Key", api_key)
-            .header("User-Agent", concat!("infracost-rs/", env!("CARGO_PKG_VERSION")))
+            .header(
+                "User-Agent",
+                concat!("infracost-rs/", env!("CARGO_PKG_VERSION")),
+            )
             .header("Content-Type", "application/json")
             .json(&operation_json)
             .send()
@@ -214,7 +217,10 @@ impl Client {
         }
 
         let response_text = response.text().await?;
-        tracing::trace!("Response: {}", &response_text[..response_text.len().min(1000)]);
+        tracing::trace!(
+            "Response: {}",
+            &response_text[..response_text.len().min(1000)]
+        );
 
         let gql_response: cynic::GraphQlResponse<ProductQuery> =
             serde_json::from_str(&response_text)?;
@@ -304,7 +310,9 @@ impl ClientBuilder {
             inner: Arc::new(ClientInner {
                 http,
                 api_key: self.api_key,
-                endpoint: self.endpoint.unwrap_or_else(|| DEFAULT_ENDPOINT.to_string()),
+                endpoint: self
+                    .endpoint
+                    .unwrap_or_else(|| DEFAULT_ENDPOINT.to_string()),
             }),
         })
     }

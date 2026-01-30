@@ -27,7 +27,9 @@ pub struct Product {
 impl Product {
     /// Get the first price
     pub fn price(&self) -> Result<&Price> {
-        self.prices.first().ok_or_else(|| Error::no_prices(&self.sku))
+        self.prices
+            .first()
+            .ok_or_else(|| Error::no_prices(&self.sku))
     }
 
     /// Get the first price as f64
@@ -69,9 +71,9 @@ pub struct Price {
 impl Price {
     /// Parse USD price as f64
     pub fn usd_f64(&self) -> Result<f64> {
-        self.usd.parse::<f64>().map_err(|e| {
-            Error::invalid_price(&self.usd, e.to_string())
-        })
+        self.usd
+            .parse::<f64>()
+            .map_err(|e| Error::invalid_price(&self.usd, e.to_string()))
     }
 }
 
@@ -124,9 +126,7 @@ impl<'a> PriceFilter<'a> {
 
     /// Get the first matching price
     pub fn first(&self) -> Result<&'a Price> {
-        self.iter()
-            .next()
-            .ok_or(Error::NoProducts)
+        self.iter().next().ok_or(Error::NoProducts)
     }
 
     /// Get the first matching price as f64
@@ -141,9 +141,9 @@ impl<'a> PriceFilter<'a> {
             let purchase_match = self
                 .purchase_option
                 .is_none_or(|po| p.purchase_option.as_deref() == Some(po));
-            let desc_match = self.description.is_none_or(|d| {
-                p.description.as_deref().is_some_and(|pd| pd.contains(d))
-            });
+            let desc_match = self
+                .description
+                .is_none_or(|d| p.description.as_deref().is_some_and(|pd| pd.contains(d)));
             unit_match && purchase_match && desc_match
         })
     }

@@ -170,7 +170,9 @@ async fn main() -> anyhow::Result<()> {
                 }
             } else {
                 match cli.format {
-                    OutputFormat::Table => print_products_table(&products, purchase_option.as_deref()),
+                    OutputFormat::Table => {
+                        print_products_table(&products, purchase_option.as_deref())
+                    }
                     OutputFormat::Json => {
                         println!("{}", serde_json::to_string_pretty(&products)?);
                     }
@@ -181,16 +183,9 @@ async fn main() -> anyhow::Result<()> {
 
         Commands::Services { vendor } => {
             // Query all products for the vendor to get unique services
-            let products = client
-                .products()
-                .vendor(&vendor)
-                .fetch()
-                .await?;
+            let products = client.products().vendor(&vendor).fetch().await?;
 
-            let mut services: Vec<_> = products
-                .iter()
-                .map(|p| p.service.as_str())
-                .collect();
+            let mut services: Vec<_> = products.iter().map(|p| p.service.as_str()).collect();
             services.sort();
             services.dedup();
 
@@ -297,7 +292,10 @@ fn build_filter(
             // Exact match
             builder = builder.attribute(key.trim(), value.trim());
         } else {
-            anyhow::bail!("Invalid attribute filter format: {}. Use key=value or key~=regex", attr);
+            anyhow::bail!(
+                "Invalid attribute filter format: {}. Use key=value or key~=regex",
+                attr
+            );
         }
     }
 
@@ -311,16 +309,11 @@ fn print_products_table(products: &[infracost::Product], purchase_option: Option
     }
 
     // Header
-    println!(
-        "{:<60} {:<12} {:<15}",
-        "DESCRIPTION", "PRICE", "UNIT"
-    );
+    println!("{:<60} {:<12} {:<15}", "DESCRIPTION", "PRICE", "UNIT");
     println!("{}", "-".repeat(87));
 
     for product in products {
-        let desc = product
-            .attribute("description")
-            .unwrap_or(&product.sku);
+        let desc = product.attribute("description").unwrap_or(&product.sku);
         // Truncate long descriptions
         let desc_display: String = if desc.len() > 57 {
             format!("{}...", &desc[..57])

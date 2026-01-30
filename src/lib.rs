@@ -28,7 +28,7 @@ pub mod mock;
 #[cfg(feature = "blocking")]
 pub mod blocking;
 
-pub use client::{Client, ClientBuilder, PricingClient, DEFAULT_ENDPOINT, DEFAULT_TIMEOUT};
+pub use client::{Client, ClientBuilder, DEFAULT_ENDPOINT, DEFAULT_TIMEOUT, PricingClient};
 pub use error::{Error, Result};
 pub use query::ProductQueryBuilder;
 pub use types::{

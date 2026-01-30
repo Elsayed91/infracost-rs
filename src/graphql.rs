@@ -91,7 +91,6 @@ pub struct ProductQueryVariables {
     pub filter: Option<GqlProductFilter>,
 }
 
-
 // Conversion from public types to GraphQL types
 impl From<&crate::types::ProductFilter> for GqlProductFilter {
     fn from(filter: &crate::types::ProductFilter) -> Self {
