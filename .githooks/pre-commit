@@ -1,6 +1,15 @@
 #!/bin/sh
 # Pre-commit hook for infracost-rs
+#   Setup:
+#   - Hook lives in .githooks/pre-commit (tracked in repo)
+#   - Git configured with git config core.hooksPath .githooks
 
+#   What it checks:
+#   1. cargo fmt --check - formatting
+#   2. cargo clippy --all-features -- -D warnings - lints
+
+#   For new clones, run once:
+#   git config core.hooksPath .githooks
 set -e
 
 echo "Running cargo fmt..."
