@@ -2,10 +2,10 @@
 //!
 //! Run with: cargo run --example ec2_pricing
 
-use infracost::Client;
+use infracost_rs::Client;
 
 #[tokio::main]
-async fn main() -> Result<(), infracost::Error> {
+async fn main() -> Result<(), infracost_rs::Error> {
     let client = Client::from_env()?;
 
     // Query t3.micro on-demand Linux pricing in us-east-1

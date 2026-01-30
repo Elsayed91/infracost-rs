@@ -1,9 +1,9 @@
 //! Rust client for the Infracost Cloud Pricing API.
 //!
 //! ```no_run
-//! use infracost::Client;
+//! use infracost_rs::Client;
 //!
-//! # async fn example() -> Result<(), infracost::Error> {
+//! # async fn example() -> Result<(), infracost_rs::Error> {
 //! let client = Client::from_env()?;
 //! let products = client
 //!     .products()

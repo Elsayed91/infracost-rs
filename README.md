@@ -7,10 +7,10 @@ Rust client for the [Infracost](https://www.infracost.io/) Cloud Pricing API.
 ```toml
 # Library
 [dependencies]
-infracost = "0.1"
+infracost-rs = "0.1"
 
 # With blocking API
-infracost = { version = "0.1", features = ["blocking"] }
+infracost-rs = { version = "0.1", features = ["blocking"] }
 ```
 
 ```bash
@@ -23,7 +23,7 @@ cargo install infracost-rs --features cli
 ### Client Modes
 
 ```rust
-use infracost::Client;
+use infracost_rs::Client;
 use std::time::Duration;
 
 // From environment variable
@@ -123,8 +123,8 @@ let hourly = products[0]
 ### Testing with Mocks
 
 ```rust
-use infracost::mock::MockClient;
-use infracost::PricingClient;
+use infracost_rs::mock::MockClient;
+use infracost_rs::PricingClient;
 
 let client = MockClient::from_prices(&[
     ("gcp", "Compute Engine", "us-central1", "pd-ssd", 0.170, "GB-month"),

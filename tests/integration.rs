@@ -7,7 +7,7 @@
 //! cargo test --test integration -- --ignored
 //! ```
 
-use infracost::{Client, ProductFilter};
+use infracost_rs::{Client, ProductFilter};
 
 fn get_client() -> Option<Client> {
     // Try to load from .env file

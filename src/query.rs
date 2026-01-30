@@ -7,8 +7,8 @@ use crate::types::{AttributeFilter, Product, ProductFilter};
 /// Builder for product queries. Get one via [`Client::products`].
 ///
 /// ```no_run
-/// # use infracost::Client;
-/// # async fn example() -> Result<(), infracost::Error> {
+/// # use infracost_rs::Client;
+/// # async fn example() -> Result<(), infracost_rs::Error> {
 /// let client = Client::from_env()?;
 /// let products = client
 ///     .products()

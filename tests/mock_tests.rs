@@ -1,7 +1,7 @@
 //! Tests for the mock client.
 
-use infracost::mock::{MockClient, MockProduct};
-use infracost::{Error, PricingClient, ProductFilter};
+use infracost_rs::mock::{MockClient, MockProduct};
+use infracost_rs::{Error, PricingClient, ProductFilter};
 
 #[tokio::test]
 async fn test_mock_client_basic() {

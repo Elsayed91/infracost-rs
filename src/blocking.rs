@@ -1,9 +1,9 @@
 //! Blocking API wrapper. Requires the `blocking` feature.
 //!
 //! ```no_run
-//! use infracost::blocking::Client;
+//! use infracost_rs::blocking::Client;
 //!
-//! fn main() -> Result<(), infracost::Error> {
+//! fn main() -> Result<(), infracost_rs::Error> {
 //!     let client = Client::from_env()?;
 //!     let products = client
 //!         .products()

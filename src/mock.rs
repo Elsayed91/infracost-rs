@@ -1,10 +1,10 @@
 //! Mock client for testing.
 //!
 //! ```
-//! use infracost::mock::{MockClient, MockProduct};
-//! use infracost::{PricingClient, ProductFilter};
+//! use infracost_rs::mock::{MockClient, MockProduct};
+//! use infracost_rs::{PricingClient, ProductFilter};
 //!
-//! # async fn example() -> Result<(), infracost::Error> {
+//! # async fn example() -> Result<(), infracost_rs::Error> {
 //! // Builder pattern
 //! let client = MockClient::builder()
 //!     .with_product(
@@ -75,7 +75,7 @@ impl MockClient {
     /// # Examples
     ///
     /// ```
-    /// use infracost::mock::MockClient;
+    /// use infracost_rs::mock::MockClient;
     ///
     /// let client = MockClient::from_prices(&[
     ///     ("gcp", "Compute Engine", "us-central1", "pd-ssd", 0.170, "GB-month"),

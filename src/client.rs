@@ -47,9 +47,9 @@ struct ClientInner {
 /// Client for the Infracost Cloud Pricing API.
 ///
 /// ```no_run
-/// use infracost::Client;
+/// use infracost_rs::Client;
 ///
-/// # async fn example() -> Result<(), infracost::Error> {
+/// # async fn example() -> Result<(), infracost_rs::Error> {
 /// let client = Client::from_env()?;        // from INFRACOST_API_KEY
 /// let client = Client::new("ico-xxx");     // explicit key
 /// let client = Client::anonymous();        // per-request key

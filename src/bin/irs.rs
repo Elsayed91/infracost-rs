@@ -14,7 +14,7 @@
 //! ```
 
 use clap::{Parser, Subcommand, ValueEnum};
-use infracost::{Client, ProductFilter};
+use infracost_rs::{Client, ProductFilter};
 
 #[derive(Parser)]
 #[command(name = "irs")]
@@ -302,7 +302,7 @@ fn build_filter(
     Ok(builder.build())
 }
 
-fn print_products_table(products: &[infracost::Product], purchase_option: Option<&str>) {
+fn print_products_table(products: &[infracost_rs::Product], purchase_option: Option<&str>) {
     if products.is_empty() {
         println!("No products found");
         return;
@@ -334,7 +334,7 @@ fn print_products_table(products: &[infracost::Product], purchase_option: Option
     }
 }
 
-fn print_products_csv(products: &[infracost::Product], purchase_option: Option<&str>) {
+fn print_products_csv(products: &[infracost_rs::Product], purchase_option: Option<&str>) {
     println!("vendor,service,region,sku,description,product_family,price,unit");
     for product in products {
         let price_entry = match purchase_option {
