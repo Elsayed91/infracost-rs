@@ -70,8 +70,14 @@ let products = client
     .fetch()
     .await?;
 
-// First price as f64 (on-demand)
+// First price as f64 (may be $0 for free tier)
 let hourly = products[0].price_f64()?;
+
+// First non-zero price (skips $0 free tier/commitment prices)
+let hourly = products[0].first_nonzero_price().unwrap_or(0.0);
+
+// Or with a default fallback
+let hourly = products[0].first_nonzero_price_or(0.10);
 
 // Filter by purchase option
 let on_demand = products[0]

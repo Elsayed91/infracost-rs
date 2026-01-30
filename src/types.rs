@@ -49,6 +49,27 @@ impl Product {
             .find(|a| a.key == key)
             .and_then(|a| a.value.as_deref())
     }
+
+    /// Get the first non-zero price as f64.
+    ///
+    /// The Infracost API often returns multiple prices including $0 for free tier
+    /// or commitment pricing. This method skips those and returns the first
+    /// actual (non-zero) price.
+    ///
+    /// Returns `None` if no non-zero price is found.
+    pub fn first_nonzero_price(&self) -> Option<f64> {
+        self.prices
+            .iter()
+            .filter_map(|p| p.usd_f64().ok())
+            .find(|&p| p > 0.0)
+    }
+
+    /// Get the first non-zero price, or a default value if none found.
+    ///
+    /// Convenience method that combines `first_nonzero_price()` with a fallback.
+    pub fn first_nonzero_price_or(&self, default: f64) -> f64 {
+        self.first_nonzero_price().unwrap_or(default)
+    }
 }
 
 /// Price information
@@ -132,6 +153,20 @@ impl<'a> PriceFilter<'a> {
     /// Get the first matching price as f64
     pub fn first_f64(&self) -> Result<f64> {
         self.first()?.usd_f64()
+    }
+
+    /// Get the first non-zero matching price as f64.
+    ///
+    /// Skips $0 prices (free tier/commitment) and returns the first actual price.
+    pub fn first_nonzero_f64(&self) -> Option<f64> {
+        self.iter()
+            .filter_map(|p| p.usd_f64().ok())
+            .find(|&p| p > 0.0)
+    }
+
+    /// Get the first non-zero matching price, or a default value.
+    pub fn first_nonzero_f64_or(&self, default: f64) -> f64 {
+        self.first_nonzero_f64().unwrap_or(default)
     }
 
     /// Iterate over matching prices
