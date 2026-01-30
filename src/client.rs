@@ -183,10 +183,10 @@ impl Client {
         remove_nulls(&mut operation_json);
 
         tracing::debug!("Sending GraphQL query to Infracost API");
-        if tracing::enabled!(tracing::Level::TRACE) {
-            if let Ok(json_str) = serde_json::to_string_pretty(&operation_json) {
-                tracing::trace!("Query: {}", json_str);
-            }
+        if tracing::enabled!(tracing::Level::TRACE)
+            && let Ok(json_str) = serde_json::to_string_pretty(&operation_json)
+        {
+            tracing::trace!("Query: {}", json_str);
         }
 
         let response = self

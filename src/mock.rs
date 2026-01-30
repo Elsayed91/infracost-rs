@@ -6,7 +6,7 @@
 //!
 //! # async fn example() -> Result<(), infracost::Error> {
 //! // Builder pattern
-//! let client = MockClient::new()
+//! let client = MockClient::builder()
 //!     .with_product(
 //!         MockProduct::new("gcp", "Compute Engine", "us-central1")
 //!             .sku("pd-ssd")
@@ -34,6 +34,9 @@ use crate::types::{Attribute, Price, Product, ProductFilter};
 use async_trait::async_trait;
 use std::sync::Arc;
 
+/// Type alias for the mock callback function
+type MockCallback = Box<dyn Fn(&ProductFilter) -> Vec<Product> + Send + Sync>;
+
 /// Mock client for testing.
 #[derive(Clone)]
 pub struct MockClient {
@@ -43,12 +46,12 @@ pub struct MockClient {
 struct MockClientInner {
     products: Vec<Product>,
     error: Option<Error>,
-    callback: Option<Box<dyn Fn(&ProductFilter) -> Vec<Product> + Send + Sync>>,
+    callback: Option<MockCallback>,
 }
 
 impl MockClient {
     /// Create a new mock client builder.
-    pub fn new() -> MockClientBuilder {
+    pub fn builder() -> MockClientBuilder {
         MockClientBuilder::default()
     }
 
@@ -437,7 +440,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock_client_with_products() {
-        let client = MockClient::new()
+        let client = MockClient::builder()
             .with_product(
                 MockProduct::new("gcp", "Compute Engine", "us-central1")
                     .sku("pd-ssd")
@@ -545,7 +548,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock_client_with_error() {
-        let client = MockClient::new()
+        let client = MockClient::builder()
             .with_error(Error::api(429, "Rate limited"))
             .build();
 

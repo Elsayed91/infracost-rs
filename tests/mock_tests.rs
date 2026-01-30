@@ -5,7 +5,7 @@ use infracost::{Error, PricingClient, ProductFilter};
 
 #[tokio::test]
 async fn test_mock_client_basic() {
-    let client = MockClient::new()
+    let client = MockClient::builder()
         .with_product(
             MockProduct::new("gcp", "Compute Engine", "us-central1")
                 .sku("pd-ssd")
@@ -30,7 +30,7 @@ async fn test_mock_client_basic() {
 
 #[tokio::test]
 async fn test_mock_client_filtering() {
-    let client = MockClient::new()
+    let client = MockClient::builder()
         .with_product(
             MockProduct::new("gcp", "Compute Engine", "us-central1")
                 .sku("pd-ssd")
@@ -125,7 +125,7 @@ async fn test_mock_client_price_extraction() {
 
 #[tokio::test]
 async fn test_mock_client_error() {
-    let client = MockClient::new()
+    let client = MockClient::builder()
         .with_error(Error::Api {
             status: 429,
             message: "Rate limited".into(),
@@ -197,7 +197,7 @@ async fn test_mock_client_json() {
 
 #[tokio::test]
 async fn test_mock_client_attributes() {
-    let client = MockClient::new()
+    let client = MockClient::builder()
         .with_product(
             MockProduct::new("gcp", "Compute Engine", "us-central1")
                 .sku("pd-ssd")
@@ -236,7 +236,7 @@ async fn test_product_filter_builder() {
 
 #[tokio::test]
 async fn test_price_filter() {
-    let client = MockClient::new()
+    let client = MockClient::builder()
         .with_product(
             MockProduct::new("gcp", "Compute Engine", "us-central1")
                 .sku("n1-standard-1")

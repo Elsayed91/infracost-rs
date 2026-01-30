@@ -137,12 +137,12 @@ impl<'a> PriceFilter<'a> {
     /// Iterate over matching prices
     pub fn iter(&self) -> impl Iterator<Item = &'a Price> + '_ {
         self.prices.iter().filter(move |p| {
-            let unit_match = self.unit.map_or(true, |u| p.unit == u);
-            let purchase_match = self.purchase_option.map_or(true, |po| {
-                p.purchase_option.as_deref() == Some(po)
-            });
-            let desc_match = self.description.map_or(true, |d| {
-                p.description.as_deref().map_or(false, |pd| pd.contains(d))
+            let unit_match = self.unit.is_none_or(|u| p.unit == u);
+            let purchase_match = self
+                .purchase_option
+                .is_none_or(|po| p.purchase_option.as_deref() == Some(po));
+            let desc_match = self.description.is_none_or(|d| {
+                p.description.as_deref().is_some_and(|pd| pd.contains(d))
             });
             unit_match && purchase_match && desc_match
         })
@@ -184,30 +184,36 @@ impl ProductFilter {
 
     /// Check if a product matches this filter
     pub fn matches(&self, product: &Product) -> bool {
-        if let Some(ref v) = self.vendor_name {
-            if !product.vendor_name.eq_ignore_ascii_case(v) {
-                return false;
-            }
+        if let Some(ref v) = self.vendor_name
+            && !product.vendor_name.eq_ignore_ascii_case(v)
+        {
+            return false;
         }
-        if let Some(ref s) = self.service {
-            if !product.service.eq_ignore_ascii_case(s) {
-                return false;
-            }
+        if let Some(ref s) = self.service
+            && !product.service.eq_ignore_ascii_case(s)
+        {
+            return false;
         }
-        if let Some(ref pf) = self.product_family {
-            if product.product_family.as_ref().map_or(true, |f| !f.eq_ignore_ascii_case(pf)) {
-                return false;
-            }
+        if let Some(ref pf) = self.product_family
+            && product
+                .product_family
+                .as_ref()
+                .is_none_or(|f| !f.eq_ignore_ascii_case(pf))
+        {
+            return false;
         }
-        if let Some(ref r) = self.region {
-            if product.region.as_ref().map_or(true, |pr| !pr.eq_ignore_ascii_case(r)) {
-                return false;
-            }
+        if let Some(ref r) = self.region
+            && product
+                .region
+                .as_ref()
+                .is_none_or(|pr| !pr.eq_ignore_ascii_case(r))
+        {
+            return false;
         }
-        if let Some(ref s) = self.sku {
-            if !product.sku.eq_ignore_ascii_case(s) {
-                return false;
-            }
+        if let Some(ref s) = self.sku
+            && !product.sku.eq_ignore_ascii_case(s)
+        {
+            return false;
         }
         for af in &self.attribute_filters {
             if !af.matches(product) {
@@ -315,10 +321,10 @@ impl AttributeFilter {
     pub fn matches(&self, product: &Product) -> bool {
         let attr_value = product.attribute(&self.key);
 
-        if let Some(ref exact) = self.value {
-            if attr_value.map_or(true, |v| v != exact) {
-                return false;
-            }
+        if let Some(ref exact) = self.value
+            && attr_value.is_none_or(|v| v != exact)
+        {
+            return false;
         }
 
         // Note: regex matching is done server-side for real queries
