@@ -14,6 +14,8 @@ cli = ["clap", "anyhow", "tokio/rt-multi-thread", "tokio/macros"]
 # Cache backends (implementations added in later tasks)
 cache-memory = ["moka"]
 cache-redis = ["redis"]
+cache-sqlite = ["sqlx/sqlite"]
+cache-postgres = ["sqlx/postgres"]
 
 [[bin]]
 name = "irs"
@@ -43,6 +45,7 @@ anyhow = { version = "1", optional = true }
 # Cache backends
 moka = { version = "0.12", features = ["future"], optional = true }
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"], optional = true }
+sqlx = { version = "0.8", features = ["runtime-tokio", "json"], optional = true }
 
 # Tracing
 tracing = "0.1"
