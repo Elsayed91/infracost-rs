@@ -53,7 +53,7 @@ jobs:
         env:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
           DATABASE_URL: postgres://infracost:infracost@localhost/infracost_cache
-        run: cargo test --test integration --features cache-redis,cache-sqlite,cache-postgres -- --ignored
+        run: cargo test --test integration --features cache-redis,cache-sqlite,cache-postgres -- --ignored --test-threads=1
 
   docs:
     runs-on: ubuntu-latest
