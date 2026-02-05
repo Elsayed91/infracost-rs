@@ -1,10 +1,26 @@
 # Docker Compose for local development and testing
 #
-# Start Redis:
-#   docker-compose up -d redis
+# Start all services:
+#   docker-compose up -d
 #
-# Run integration tests with Redis:
+# Start specific service:
+#   docker-compose up -d redis
+#   docker-compose up -d postgres
+#
+# Run integration tests:
+#   # Redis tests
 #   INFRACOST_API_KEY=your-key cargo test --test integration --features cache-redis -- --ignored
+#
+#   # SQLite tests (no service needed)
+#   INFRACOST_API_KEY=your-key cargo test --test integration --features cache-sqlite -- --ignored
+#
+#   # PostgreSQL tests
+#   DATABASE_URL=postgres://infracost:infracost@localhost/infracost_cache \
+#   INFRACOST_API_KEY=your-key cargo test --test integration --features cache-postgres -- --ignored
+#
+#   # All cache tests
+#   DATABASE_URL=postgres://infracost:infracost@localhost/infracost_cache \
+#   INFRACOST_API_KEY=your-key cargo test --test integration --features cache-redis,cache-sqlite,cache-postgres -- --ignored
 
 services:
   redis:
@@ -20,5 +36,22 @@ services:
       timeout: 3s
       retries: 5
 
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: infracost
+      POSTGRES_PASSWORD: infracost
+      POSTGRES_DB: infracost_cache
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infracost"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   redis-data:
+  postgres-data:
