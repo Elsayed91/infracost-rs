@@ -1,0 +1,24 @@
+# Docker Compose for local development and testing
+#
+# Start Redis:
+#   docker-compose up -d redis
+#
+# Run integration tests with Redis:
+#   INFRACOST_API_KEY=your-key cargo test --test integration --features cache-redis -- --ignored
+
+services:
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis-data:

@@ -304,3 +304,64 @@ async fn test_price_filter() {
         .unwrap();
     assert!((preemptible.usd_f64().unwrap() - 0.0142).abs() < 0.001);
 }
+
+#[cfg(feature = "cache-memory")]
+mod cache_tests {
+    use infracost_rs::{Client, MemoryCache, PriceCache};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
+
+    /// Custom cache that counts calls for testing.
+    struct CountingCache {
+        inner: MemoryCache,
+        get_count: AtomicUsize,
+        set_count: AtomicUsize,
+    }
+
+    impl CountingCache {
+        fn new() -> Self {
+            Self {
+                inner: MemoryCache::new(),
+                get_count: AtomicUsize::new(0),
+                set_count: AtomicUsize::new(0),
+            }
+        }
+
+        fn get_count(&self) -> usize {
+            self.get_count.load(Ordering::SeqCst)
+        }
+
+        fn set_count(&self) -> usize {
+            self.set_count.load(Ordering::SeqCst)
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl PriceCache for CountingCache {
+        async fn get(&self, key: &str) -> Option<Vec<infracost_rs::Product>> {
+            self.get_count.fetch_add(1, Ordering::SeqCst);
+            self.inner.get(key).await
+        }
+
+        async fn set(&self, key: &str, products: &[infracost_rs::Product], ttl: Duration) {
+            self.set_count.fetch_add(1, Ordering::SeqCst);
+            self.inner.set(key, products, ttl).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cache_not_used_without_api_key() {
+        // When no API key is provided, cache should never be touched
+        let cache = Arc::new(CountingCache::new());
+
+        let client = Client::builder().with_cache(cache.clone()).build().unwrap();
+
+        // This should fail with MissingApiKey before reaching cache
+        let result = client.products().vendor("aws").fetch().await;
+
+        assert!(result.is_err());
+        assert_eq!(cache.get_count(), 0);
+        assert_eq!(cache.set_count(), 0);
+    }
+}

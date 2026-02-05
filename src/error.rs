@@ -54,6 +54,10 @@ pub enum Error {
     #[error("Configuration error: {0}")]
     Config(String),
 
+    /// Validation error (e.g., missing required parameters)
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     /// I/O error (for file operations)
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
@@ -89,6 +93,16 @@ impl Error {
     /// Create a configuration error
     pub fn config(message: impl Into<String>) -> Self {
         Self::Config(message.into())
+    }
+
+    /// Create a no products error
+    pub fn no_products() -> Self {
+        Self::NoProducts
+    }
+
+    /// Create a validation error
+    pub fn validation(message: impl Into<String>) -> Self {
+        Self::Validation(message.into())
     }
 }
 

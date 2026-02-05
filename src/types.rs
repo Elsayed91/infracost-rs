@@ -1,5 +1,8 @@
 //! Core types: [`Product`], [`Price`], [`ProductFilter`].
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
 use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 
@@ -257,6 +260,38 @@ impl ProductFilter {
         }
         true
     }
+
+    /// Generate a deterministic cache key for this filter.
+    ///
+    /// The key is a hash of all filter fields, with attributes sorted
+    /// for determinism. Two filters with the same values will always
+    /// produce the same cache key.
+    pub fn cache_key(&self) -> String {
+        let mut attrs: Vec<String> = self
+            .attribute_filters
+            .iter()
+            .map(|a| {
+                let value = a.value.as_deref().unwrap_or("");
+                let regex = a.value_regex.as_deref().unwrap_or("");
+                format!("{}={}~{}", a.key, value, regex)
+            })
+            .collect();
+        attrs.sort();
+
+        let canonical = format!(
+            "{}:{}:{}:{}:{}:{}",
+            self.vendor_name.as_deref().unwrap_or(""),
+            self.service.as_deref().unwrap_or(""),
+            self.region.as_deref().unwrap_or(""),
+            self.product_family.as_deref().unwrap_or(""),
+            self.sku.as_deref().unwrap_or(""),
+            attrs.join(";")
+        );
+
+        let mut hasher = DefaultHasher::new();
+        canonical.hash(&mut hasher);
+        format!("infracost:v1:{:x}", hasher.finish())
+    }
 }
 
 /// Builder for ProductFilter
@@ -373,5 +408,91 @@ impl AttributeFilter {
         }
 
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cache_key_deterministic() {
+        let filter1 = ProductFilter {
+            vendor_name: Some("aws".to_string()),
+            service: Some("AmazonEC2".to_string()),
+            region: Some("us-east-1".to_string()),
+            product_family: Some("Storage".to_string()),
+            sku: None,
+            attribute_filters: vec![
+                AttributeFilter::exact("volumeApiName", "gp3"),
+                AttributeFilter::exact("servicecode", "AmazonEC2"),
+            ],
+        };
+
+        let filter2 = ProductFilter {
+            vendor_name: Some("aws".to_string()),
+            service: Some("AmazonEC2".to_string()),
+            region: Some("us-east-1".to_string()),
+            product_family: Some("Storage".to_string()),
+            sku: None,
+            attribute_filters: vec![
+                AttributeFilter::exact("volumeApiName", "gp3"),
+                AttributeFilter::exact("servicecode", "AmazonEC2"),
+            ],
+        };
+
+        assert_eq!(filter1.cache_key(), filter2.cache_key());
+    }
+
+    #[test]
+    fn test_cache_key_attribute_order_independent() {
+        let filter1 = ProductFilter {
+            vendor_name: Some("aws".to_string()),
+            attribute_filters: vec![
+                AttributeFilter::exact("a", "1"),
+                AttributeFilter::exact("b", "2"),
+            ],
+            ..Default::default()
+        };
+
+        let filter2 = ProductFilter {
+            vendor_name: Some("aws".to_string()),
+            attribute_filters: vec![
+                AttributeFilter::exact("b", "2"),
+                AttributeFilter::exact("a", "1"),
+            ],
+            ..Default::default()
+        };
+
+        assert_eq!(filter1.cache_key(), filter2.cache_key());
+    }
+
+    #[test]
+    fn test_cache_key_different_filters() {
+        let filter1 = ProductFilter {
+            vendor_name: Some("aws".to_string()),
+            region: Some("us-east-1".to_string()),
+            ..Default::default()
+        };
+
+        let filter2 = ProductFilter {
+            vendor_name: Some("aws".to_string()),
+            region: Some("us-west-2".to_string()),
+            ..Default::default()
+        };
+
+        assert_ne!(filter1.cache_key(), filter2.cache_key());
+    }
+
+    #[test]
+    fn test_cache_key_format() {
+        let filter = ProductFilter {
+            vendor_name: Some("gcp".to_string()),
+            ..Default::default()
+        };
+
+        let key = filter.cache_key();
+        assert!(key.starts_with("infracost:v1:"));
+        assert_eq!(key.len(), "infracost:v1:".len() + 16); // 64-bit hex = 16 chars
     }
 }

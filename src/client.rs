@@ -3,8 +3,12 @@
 //! Use [`Client::from_env`] to create a client from `INFRACOST_API_KEY`,
 //! or [`Client::new`] with an explicit key.
 
+use crate::cache::{DEFAULT_CACHE_TTL, PriceCache};
 use crate::error::{Error, Result};
 use crate::graphql::{GqlProductFilter, ProductQuery, ProductQueryVariables};
+use crate::providers::aws::AwsProvider;
+use crate::providers::azure::AzureProvider;
+use crate::providers::gcp::GcpProvider;
 use crate::query::ProductQueryBuilder;
 use crate::types::{Product, ProductFilter};
 use async_trait::async_trait;
@@ -42,6 +46,9 @@ struct ClientInner {
     http: reqwest::Client,
     api_key: Option<String>,
     endpoint: String,
+    error_on_fallback: bool,
+    cache: Option<Arc<dyn PriceCache>>,
+    cache_ttl: Duration,
 }
 
 /// Client for the Infracost Cloud Pricing API.
@@ -91,6 +98,9 @@ impl Client {
                     .expect("Failed to build HTTP client"),
                 api_key: Some(api_key.into()),
                 endpoint: DEFAULT_ENDPOINT.to_string(),
+                error_on_fallback: false,
+                cache: None,
+                cache_ttl: DEFAULT_CACHE_TTL,
             }),
         }
     }
@@ -115,6 +125,9 @@ impl Client {
                     .expect("Failed to build HTTP client"),
                 api_key: None,
                 endpoint: DEFAULT_ENDPOINT.to_string(),
+                error_on_fallback: false,
+                cache: None,
+                cache_ttl: DEFAULT_CACHE_TTL,
             }),
         }
     }
@@ -134,12 +147,86 @@ impl Client {
         self.inner.api_key.is_some()
     }
 
+    /// Check if this client will error on fallback to defaults.
+    pub fn error_on_fallback(&self) -> bool {
+        self.inner.error_on_fallback
+    }
+
     /// Start building a product query.
     ///
     /// This is a convenience method that provides direct access without
     /// requiring the `PricingClient` trait to be in scope.
     pub fn products(&self) -> ProductQueryBuilder {
         ProductQueryBuilder::new(self.clone())
+    }
+
+    /// Access GCP resource pricing with built-in defaults.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use infracost_rs::Client;
+    /// use infracost_rs::providers::gcp::DiskType;
+    ///
+    /// # async fn example() -> Result<(), infracost_rs::Error> {
+    /// let client = Client::anonymous();
+    /// let price = client
+    ///     .gcp()
+    ///     .disk(DiskType::PdSsd)
+    ///     .region("us-central1")
+    ///     .fetch_price()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn gcp(&self) -> GcpProvider<'_> {
+        GcpProvider::new(self)
+    }
+
+    /// Access AWS resource pricing with built-in defaults.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use infracost_rs::Client;
+    /// use infracost_rs::providers::aws::EbsType;
+    ///
+    /// # async fn example() -> Result<(), infracost_rs::Error> {
+    /// let client = Client::anonymous();
+    /// let price = client
+    ///     .aws()
+    ///     .ebs(EbsType::Gp3)
+    ///     .region("us-east-1")
+    ///     .fetch_price()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn aws(&self) -> AwsProvider<'_> {
+        AwsProvider::new(self)
+    }
+
+    /// Access Azure resource pricing with built-in defaults.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use infracost_rs::Client;
+    /// use infracost_rs::providers::azure::{ManagedDiskType, ManagedDiskSize};
+    ///
+    /// # async fn example() -> Result<(), infracost_rs::Error> {
+    /// let client = Client::anonymous();
+    /// let price = client
+    ///     .azure()
+    ///     .managed_disk(ManagedDiskType::PremiumSsd, ManagedDiskSize::P10)
+    ///     .region("eastus")
+    ///     .fetch_price()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn azure(&self) -> AzureProvider<'_> {
+        AzureProvider::new(self)
     }
 
     /// Execute a raw query with a filter.
@@ -171,6 +258,16 @@ impl Client {
         let api_key = api_key_override
             .or(self.inner.api_key.as_deref())
             .ok_or(Error::MissingApiKey)?;
+
+        // Check cache first (only for authenticated requests)
+        let cache_key = filter.cache_key();
+        if let Some(cache) = &self.inner.cache {
+            if let Some(cached) = cache.get(&cache_key).await {
+                tracing::debug!(key = %cache_key, "cache hit");
+                return Ok(cached);
+            }
+            tracing::debug!(key = %cache_key, "cache miss");
+        }
 
         let gql_filter: GqlProductFilter = filter.into();
         let operation = ProductQuery::build(ProductQueryVariables {
@@ -243,6 +340,12 @@ impl Client {
             .collect();
 
         tracing::debug!("Query returned {} products", products.len());
+
+        // Cache the result
+        if let Some(cache) = &self.inner.cache {
+            cache.set(&cache_key, &products, self.inner.cache_ttl).await;
+        }
+
         Ok(products)
     }
 }
@@ -263,11 +366,27 @@ impl PricingClient for Client {
 }
 
 /// Builder for constructing a Client with custom configuration.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ClientBuilder {
     api_key: Option<String>,
     endpoint: Option<String>,
     timeout: Duration,
+    error_on_fallback: bool,
+    cache: Option<Arc<dyn PriceCache>>,
+    cache_ttl: Duration,
+}
+
+impl std::fmt::Debug for ClientBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClientBuilder")
+            .field("api_key", &self.api_key.as_ref().map(|_| "***"))
+            .field("endpoint", &self.endpoint)
+            .field("timeout", &self.timeout)
+            .field("error_on_fallback", &self.error_on_fallback)
+            .field("has_cache", &self.cache.is_some())
+            .field("cache_ttl", &self.cache_ttl)
+            .finish()
+    }
 }
 
 impl Default for ClientBuilder {
@@ -276,6 +395,9 @@ impl Default for ClientBuilder {
             api_key: None,
             endpoint: None,
             timeout: DEFAULT_TIMEOUT,
+            error_on_fallback: false,
+            cache: None,
+            cache_ttl: DEFAULT_CACHE_TTL,
         }
     }
 }
@@ -299,6 +421,31 @@ impl ClientBuilder {
         self
     }
 
+    /// Error instead of returning default prices when API is unavailable.
+    ///
+    /// By default, the library gracefully falls back to built-in default prices
+    /// when the API fails or no API key is provided. Enable this for strict mode
+    /// where you want errors instead of potentially stale defaults.
+    ///
+    /// Note: You can also check `PriceResult.source` to see if a price came from
+    /// the API or from defaults, which gives you more flexibility.
+    pub fn error_on_fallback(mut self, enabled: bool) -> Self {
+        self.error_on_fallback = enabled;
+        self
+    }
+
+    /// Enable caching with a custom cache implementation.
+    pub fn with_cache<C: PriceCache + 'static>(mut self, cache: C) -> Self {
+        self.cache = Some(Arc::new(cache));
+        self
+    }
+
+    /// Set cache TTL (default: 24 hours).
+    pub fn cache_ttl(mut self, ttl: Duration) -> Self {
+        self.cache_ttl = ttl;
+        self
+    }
+
     /// Build the client.
     pub fn build(self) -> Result<Client> {
         let http = reqwest::Client::builder()
@@ -313,6 +460,9 @@ impl ClientBuilder {
                 endpoint: self
                     .endpoint
                     .unwrap_or_else(|| DEFAULT_ENDPOINT.to_string()),
+                error_on_fallback: self.error_on_fallback,
+                cache: self.cache,
+                cache_ttl: self.cache_ttl,
             }),
         })
     }
@@ -370,6 +520,37 @@ mod tests {
     }
 
     #[test]
+    fn test_client_error_on_fallback_default() {
+        let client = Client::new("test-key");
+        assert!(!client.error_on_fallback());
+
+        let client = Client::anonymous();
+        assert!(!client.error_on_fallback());
+    }
+
+    #[test]
+    fn test_client_builder_error_on_fallback() {
+        let client = Client::builder()
+            .api_key("test-key")
+            .error_on_fallback(true)
+            .build()
+            .unwrap();
+
+        assert!(client.error_on_fallback());
+    }
+
+    #[test]
+    fn test_client_builder_error_on_fallback_false() {
+        let client = Client::builder()
+            .api_key("test-key")
+            .error_on_fallback(false)
+            .build()
+            .unwrap();
+
+        assert!(!client.error_on_fallback());
+    }
+
+    #[test]
     fn test_remove_nulls() {
         let mut value = serde_json::json!({
             "a": 1,
@@ -386,5 +567,18 @@ mod tests {
         assert!(value.get("b").is_none());
         assert!(value["c"].get("e").is_none());
         assert_eq!(value["c"]["d"], 2);
+    }
+
+    #[test]
+    fn test_client_builder_with_cache_ttl() {
+        use std::time::Duration;
+
+        let client = Client::builder()
+            .api_key("test-key")
+            .cache_ttl(Duration::from_secs(3600))
+            .build()
+            .unwrap();
+
+        assert!(client.has_api_key());
     }
 }

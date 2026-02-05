@@ -22,6 +22,16 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -29,7 +39,7 @@ jobs:
       - name: Run integration tests
         env:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
-        run: cargo test --test integration -- --ignored
+        run: cargo test --test integration --features cache-redis -- --ignored
 
   docs:
     runs-on: ubuntu-latest

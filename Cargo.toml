@@ -11,6 +11,9 @@ keywords = ["infracost", "pricing", "cloud", "aws", "gcp"]
 default = []
 blocking = ["tokio/rt"]
 cli = ["clap", "anyhow", "tokio/rt-multi-thread", "tokio/macros"]
+# Cache backends (implementations added in later tasks)
+cache-memory = ["moka"]
+cache-redis = ["redis"]
 
 [[bin]]
 name = "irs"
@@ -36,6 +39,10 @@ thiserror = "2.0.18"
 # CLI (optional)
 clap = { version = "4", features = ["derive", "env"], optional = true }
 anyhow = { version = "1", optional = true }
+
+# Cache backends
+moka = { version = "0.12", features = ["future"], optional = true }
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"], optional = true }
 
 # Tracing
 tracing = "0.1"
