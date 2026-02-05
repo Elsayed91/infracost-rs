@@ -84,9 +84,13 @@ pub mod blocking;
 
 #[cfg(feature = "cache-memory")]
 pub use cache::MemoryCache;
+#[cfg(feature = "cache-postgres")]
+pub use cache::PostgresCache;
 pub use cache::PriceCache;
 #[cfg(feature = "cache-redis")]
 pub use cache::RedisCache;
+#[cfg(feature = "cache-sqlite")]
+pub use cache::SqliteCache;
 pub use client::{Client, ClientBuilder, DEFAULT_ENDPOINT, DEFAULT_TIMEOUT, PricingClient};
 pub use error::{Error, Result};
 pub use providers::{PriceResult, PriceSource};
