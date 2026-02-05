@@ -673,3 +673,204 @@ mod redis_cache_tests {
         );
     }
 }
+
+// ============================================================
+// SQLite Cache Integration Tests
+// ============================================================
+
+#[cfg(feature = "cache-sqlite")]
+mod sqlite_cache_tests {
+    use infracost_rs::cache::SqliteCache;
+    use infracost_rs::{Client, PriceCache};
+    use std::time::Duration;
+
+    fn get_client_with_cache() -> Option<Client> {
+        let _ = dotenvy::dotenv();
+
+        // Use temp file for integration tests
+        let cache = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(SqliteCache::new("/tmp/infracost_test_cache.db"))
+            .ok()?;
+
+        Client::builder()
+            .api_key(std::env::var("INFRACOST_API_KEY").ok()?)
+            .with_cache(cache)
+            .cache_ttl(Duration::from_secs(300))
+            .build()
+            .ok()
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires API key"]
+    async fn test_sqlite_cache_basic_operations() {
+        let cache = SqliteCache::new("/tmp/infracost_sqlite_test.db")
+            .await
+            .expect("Should create SQLite cache");
+
+        // Test set and get
+        let products = vec![infracost_rs::Product {
+            product_hash: "test-hash".to_string(),
+            vendor_name: "test-vendor".to_string(),
+            service: "test-service".to_string(),
+            product_family: Some("test-family".to_string()),
+            region: Some("us-east-1".to_string()),
+            sku: "test-sku".to_string(),
+            attributes: vec![],
+            prices: vec![],
+        }];
+
+        cache
+            .set("sqlite-test-key", &products, Duration::from_secs(60))
+            .await;
+
+        let cached = cache.get("sqlite-test-key").await;
+        assert!(cached.is_some(), "Should retrieve cached products");
+        assert_eq!(cached.unwrap().len(), 1);
+
+        // Clean up
+        cache.clear().await;
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires API key"]
+    async fn test_sqlite_cache_miss() {
+        let cache = SqliteCache::new("/tmp/infracost_sqlite_test.db")
+            .await
+            .expect("Should create SQLite cache");
+
+        let cached = cache.get("nonexistent-key-sqlite-12345").await;
+        assert!(cached.is_none(), "Should return None for cache miss");
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires API key"]
+    async fn test_sqlite_cache_with_client() {
+        let client = get_client_with_cache().expect("Requires API key");
+
+        // First call - should hit API and cache the result
+        let result1 = client
+            .gcp()
+            .disk(infracost_rs::providers::gcp::DiskType::PdSsd)
+            .region("us-central1")
+            .fetch()
+            .await
+            .expect("First query should succeed");
+
+        assert!(result1.is_from_api(), "First call should be from API");
+        assert!(result1.price > 0.0, "Should have a price");
+
+        // Second call with same parameters - should be a cache hit
+        let result2 = client
+            .gcp()
+            .disk(infracost_rs::providers::gcp::DiskType::PdSsd)
+            .region("us-central1")
+            .fetch()
+            .await
+            .expect("Second query should succeed");
+
+        // Results should match
+        assert_eq!(result1.price, result2.price, "Prices should match");
+        assert_eq!(result1.unit, result2.unit, "Units should match");
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires API key"]
+    async fn test_sqlite_cache_different_queries() {
+        let client = get_client_with_cache().expect("Requires API key");
+
+        // Query 1: GCP SSD disk
+        let result1 = client
+            .gcp()
+            .disk(infracost_rs::providers::gcp::DiskType::PdSsd)
+            .region("us-central1")
+            .fetch()
+            .await
+            .expect("Query 1 should succeed");
+
+        // Query 2: GCP Standard disk (different cache key)
+        let result2 = client
+            .gcp()
+            .disk(infracost_rs::providers::gcp::DiskType::PdStandard)
+            .region("us-central1")
+            .fetch()
+            .await
+            .expect("Query 2 should succeed");
+
+        // Prices should be different
+        assert_ne!(
+            result1.price, result2.price,
+            "Different disk types should have different prices"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires API key"]
+    async fn test_sqlite_cache_multi_provider() {
+        let client = get_client_with_cache().expect("Requires API key");
+
+        // Test caching works across different providers
+        let gcp_result = client
+            .gcp()
+            .disk(infracost_rs::providers::gcp::DiskType::PdSsd)
+            .region("us-central1")
+            .fetch()
+            .await
+            .expect("GCP query should succeed");
+
+        let aws_result = client
+            .aws()
+            .ebs(infracost_rs::providers::aws::EbsType::Gp3)
+            .region("us-east-1")
+            .fetch()
+            .await
+            .expect("AWS query should succeed");
+
+        assert!(gcp_result.price > 0.0, "GCP should have price");
+        assert!(aws_result.price > 0.0, "AWS should have price");
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires API key"]
+    async fn test_sqlite_cache_clear() {
+        let cache = SqliteCache::new("/tmp/infracost_sqlite_clear_test.db")
+            .await
+            .expect("Should create SQLite cache");
+
+        // Set some test data
+        let products = vec![];
+        cache
+            .set(
+                "infracost:v1:sqlite-test1",
+                &products,
+                Duration::from_secs(60),
+            )
+            .await;
+        cache
+            .set(
+                "infracost:v1:sqlite-test2",
+                &products,
+                Duration::from_secs(60),
+            )
+            .await;
+
+        // Verify data was set
+        assert!(cache.get("infracost:v1:sqlite-test1").await.is_some());
+
+        // Clear all entries
+        cache.clear().await;
+
+        // Give it a moment
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Verify data was cleared
+        assert!(
+            cache.get("infracost:v1:sqlite-test1").await.is_none(),
+            "Cache should be cleared"
+        );
+        assert!(
+            cache.get("infracost:v1:sqlite-test2").await.is_none(),
+            "Cache should be cleared"
+        );
+    }
+}
