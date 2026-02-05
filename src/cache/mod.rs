@@ -15,11 +15,15 @@
 mod memory;
 #[cfg(feature = "cache-redis")]
 mod redis;
+#[cfg(feature = "cache-sqlite")]
+mod sqlite;
 
 #[cfg(feature = "cache-memory")]
 pub use memory::{MemoryCache, MemoryCacheBuilder};
 #[cfg(feature = "cache-redis")]
 pub use redis::RedisCache;
+#[cfg(feature = "cache-sqlite")]
+pub use sqlite::{SqliteCache, SqliteCacheBuilder};
 
 use crate::types::Product;
 use async_trait::async_trait;
