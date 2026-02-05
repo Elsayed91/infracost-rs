@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Row, SqlitePool};
 use std::str::FromStr;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// SQLite-backed cache for local persistent caching.
@@ -73,7 +72,7 @@ impl SqliteCacheBuilder {
             .connect_with(options)
             .await?;
 
-        SqliteCache::from_pool(Arc::new(pool)).await
+        SqliteCache::from_pool(pool).await
     }
 }
 
@@ -88,7 +87,8 @@ impl SqliteCache {
     /// Create a SQLite cache from an existing pool.
     ///
     /// Runs migrations on the provided pool.
-    pub async fn from_pool(pool: Arc<SqlitePool>) -> Result<Self, sqlx::Error> {
+    /// Note: `SqlitePool` is internally `Arc`-based, so cloning is cheap.
+    pub async fn from_pool(pool: SqlitePool) -> Result<Self, sqlx::Error> {
         // Run migrations
         sqlx::query(
             r#"
@@ -99,7 +99,7 @@ impl SqliteCache {
             )
             "#,
         )
-        .execute(pool.as_ref())
+        .execute(&pool)
         .await?;
 
         sqlx::query(
@@ -108,12 +108,10 @@ impl SqliteCache {
             ON infracost_cache(expires_at)
             "#,
         )
-        .execute(pool.as_ref())
+        .execute(&pool)
         .await?;
 
-        Ok(Self {
-            pool: Arc::try_unwrap(pool).unwrap_or_else(|arc| (*arc).clone()),
-        })
+        Ok(Self { pool })
     }
 
     /// Create a builder for more configuration options.

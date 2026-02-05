@@ -5,7 +5,6 @@ use crate::types::Product;
 use async_trait::async_trait;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgPool, Row};
-use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// PostgreSQL-backed cache for distributed caching.
@@ -64,7 +63,7 @@ impl PostgresCacheBuilder {
             .connect(&self.url)
             .await?;
 
-        PostgresCache::from_pool(Arc::new(pool)).await
+        PostgresCache::from_pool(pool).await
     }
 }
 
@@ -79,7 +78,8 @@ impl PostgresCache {
     /// Create a PostgreSQL cache from an existing pool.
     ///
     /// Runs migrations on the provided pool.
-    pub async fn from_pool(pool: Arc<PgPool>) -> Result<Self, sqlx::Error> {
+    /// Note: `PgPool` is internally `Arc`-based, so cloning is cheap.
+    pub async fn from_pool(pool: PgPool) -> Result<Self, sqlx::Error> {
         // Run migrations
         sqlx::query(
             r#"
@@ -90,7 +90,7 @@ impl PostgresCache {
             )
             "#,
         )
-        .execute(pool.as_ref())
+        .execute(&pool)
         .await?;
 
         sqlx::query(
@@ -99,12 +99,10 @@ impl PostgresCache {
             ON infracost_cache(expires_at)
             "#,
         )
-        .execute(pool.as_ref())
+        .execute(&pool)
         .await?;
 
-        Ok(Self {
-            pool: Arc::try_unwrap(pool).unwrap_or_else(|arc| (*arc).clone()),
-        })
+        Ok(Self { pool })
     }
 
     /// Create a builder for more configuration options.
