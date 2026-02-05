@@ -13,6 +13,8 @@
 
 #[cfg(feature = "cache-memory")]
 mod memory;
+#[cfg(feature = "cache-postgres")]
+mod postgres;
 #[cfg(feature = "cache-redis")]
 mod redis;
 #[cfg(feature = "cache-sqlite")]
@@ -20,6 +22,8 @@ mod sqlite;
 
 #[cfg(feature = "cache-memory")]
 pub use memory::{MemoryCache, MemoryCacheBuilder};
+#[cfg(feature = "cache-postgres")]
+pub use postgres::{PostgresCache, PostgresCacheBuilder};
 #[cfg(feature = "cache-redis")]
 pub use redis::RedisCache;
 #[cfg(feature = "cache-sqlite")]
