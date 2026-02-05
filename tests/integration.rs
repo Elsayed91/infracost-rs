@@ -874,3 +874,239 @@ mod sqlite_cache_tests {
         );
     }
 }
+
+// ============================================================
+// PostgreSQL Cache Integration Tests
+// ============================================================
+
+#[cfg(feature = "cache-postgres")]
+mod postgres_cache_tests {
+    use infracost_rs::cache::PostgresCache;
+    use infracost_rs::{Client, PriceCache};
+    use std::time::Duration;
+
+    fn get_postgres_url() -> String {
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://infracost:infracost@localhost/infracost_cache".to_string()
+        })
+    }
+
+    fn get_client_with_cache() -> Option<Client> {
+        let _ = dotenvy::dotenv();
+
+        let url = get_postgres_url();
+        let cache = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(PostgresCache::new(&url))
+            .ok()?;
+
+        Client::builder()
+            .api_key(std::env::var("INFRACOST_API_KEY").ok()?)
+            .with_cache(cache)
+            .cache_ttl(Duration::from_secs(300))
+            .build()
+            .ok()
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires PostgreSQL and API key"]
+    async fn test_postgres_cache_basic_operations() {
+        let url = get_postgres_url();
+        let cache = PostgresCache::new(&url)
+            .await
+            .expect("Should connect to PostgreSQL");
+
+        // Test set and get
+        let products = vec![infracost_rs::Product {
+            product_hash: "test-hash".to_string(),
+            vendor_name: "test-vendor".to_string(),
+            service: "test-service".to_string(),
+            product_family: Some("test-family".to_string()),
+            region: Some("us-east-1".to_string()),
+            sku: "test-sku".to_string(),
+            attributes: vec![],
+            prices: vec![],
+        }];
+
+        cache
+            .set("postgres-test-key", &products, Duration::from_secs(60))
+            .await;
+
+        let cached = cache.get("postgres-test-key").await;
+        assert!(cached.is_some(), "Should retrieve cached products");
+        assert_eq!(cached.unwrap().len(), 1);
+
+        // Clean up
+        cache.clear().await;
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires PostgreSQL and API key"]
+    async fn test_postgres_cache_miss() {
+        let url = get_postgres_url();
+        let cache = PostgresCache::new(&url)
+            .await
+            .expect("Should connect to PostgreSQL");
+
+        let cached = cache.get("nonexistent-key-postgres-12345").await;
+        assert!(cached.is_none(), "Should return None for cache miss");
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires PostgreSQL and API key"]
+    async fn test_postgres_cache_with_client() {
+        let client = get_client_with_cache().expect("Requires API key and PostgreSQL");
+
+        // First call - should hit API and cache the result
+        let result1 = client
+            .gcp()
+            .disk(infracost_rs::providers::gcp::DiskType::PdSsd)
+            .region("us-central1")
+            .fetch()
+            .await
+            .expect("First query should succeed");
+
+        assert!(result1.is_from_api(), "First call should be from API");
+        assert!(result1.price > 0.0, "Should have a price");
+
+        // Second call with same parameters - should be a cache hit
+        let result2 = client
+            .gcp()
+            .disk(infracost_rs::providers::gcp::DiskType::PdSsd)
+            .region("us-central1")
+            .fetch()
+            .await
+            .expect("Second query should succeed");
+
+        // Results should match
+        assert_eq!(result1.price, result2.price, "Prices should match");
+        assert_eq!(result1.unit, result2.unit, "Units should match");
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires PostgreSQL and API key"]
+    async fn test_postgres_cache_different_queries() {
+        let client = get_client_with_cache().expect("Requires API key and PostgreSQL");
+
+        // Query 1: GCP SSD disk
+        let result1 = client
+            .gcp()
+            .disk(infracost_rs::providers::gcp::DiskType::PdSsd)
+            .region("us-central1")
+            .fetch()
+            .await
+            .expect("Query 1 should succeed");
+
+        // Query 2: GCP Standard disk (different cache key)
+        let result2 = client
+            .gcp()
+            .disk(infracost_rs::providers::gcp::DiskType::PdStandard)
+            .region("us-central1")
+            .fetch()
+            .await
+            .expect("Query 2 should succeed");
+
+        // Prices should be different
+        assert_ne!(
+            result1.price, result2.price,
+            "Different disk types should have different prices"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires PostgreSQL and API key"]
+    async fn test_postgres_cache_multi_provider() {
+        let client = get_client_with_cache().expect("Requires API key and PostgreSQL");
+
+        // Test caching works across different providers
+        let gcp_result = client
+            .gcp()
+            .disk(infracost_rs::providers::gcp::DiskType::PdSsd)
+            .region("us-central1")
+            .fetch()
+            .await
+            .expect("GCP query should succeed");
+
+        let aws_result = client
+            .aws()
+            .ebs(infracost_rs::providers::aws::EbsType::Gp3)
+            .region("us-east-1")
+            .fetch()
+            .await
+            .expect("AWS query should succeed");
+
+        assert!(gcp_result.price > 0.0, "GCP should have price");
+        assert!(aws_result.price > 0.0, "AWS should have price");
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires PostgreSQL and API key"]
+    async fn test_postgres_cache_clear() {
+        let url = get_postgres_url();
+        let cache = PostgresCache::new(&url)
+            .await
+            .expect("Should connect to PostgreSQL");
+
+        // Set some test data
+        let products = vec![];
+        cache
+            .set("infracost:v1:pg-test1", &products, Duration::from_secs(60))
+            .await;
+        cache
+            .set("infracost:v1:pg-test2", &products, Duration::from_secs(60))
+            .await;
+
+        // Verify data was set
+        assert!(cache.get("infracost:v1:pg-test1").await.is_some());
+
+        // Clear all entries
+        cache.clear().await;
+
+        // Give it a moment
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Verify data was cleared
+        assert!(
+            cache.get("infracost:v1:pg-test1").await.is_none(),
+            "Cache should be cleared"
+        );
+        assert!(
+            cache.get("infracost:v1:pg-test2").await.is_none(),
+            "Cache should be cleared"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires PostgreSQL and API key"]
+    async fn test_postgres_cache_expiration() {
+        let url = get_postgres_url();
+        let cache = PostgresCache::new(&url)
+            .await
+            .expect("Should connect to PostgreSQL");
+
+        let products = vec![infracost_rs::Product {
+            product_hash: "expire-hash".to_string(),
+            vendor_name: "test-vendor".to_string(),
+            service: "test-service".to_string(),
+            product_family: None,
+            region: None,
+            sku: "expire-sku".to_string(),
+            attributes: vec![],
+            prices: vec![],
+        }];
+
+        // Set with 1 second TTL
+        cache
+            .set("pg-expire-key", &products, Duration::from_secs(1))
+            .await;
+
+        // Should exist immediately
+        assert!(cache.get("pg-expire-key").await.is_some());
+
+        // Wait for expiration
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        // Should be expired
+        assert!(cache.get("pg-expire-key").await.is_none());
+    }
+}
