@@ -684,13 +684,12 @@ mod sqlite_cache_tests {
     use infracost_rs::{Client, PriceCache};
     use std::time::Duration;
 
-    fn get_client_with_cache() -> Option<Client> {
+    async fn get_client_with_cache() -> Option<Client> {
         let _ = dotenvy::dotenv();
 
         // Use temp file for integration tests
-        let cache = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(SqliteCache::new("/tmp/infracost_test_cache.db"))
+        let cache = SqliteCache::new("/tmp/infracost_test_cache.db")
+            .await
             .ok()?;
 
         Client::builder()
@@ -746,7 +745,7 @@ mod sqlite_cache_tests {
     #[tokio::test]
     #[ignore = "Requires API key"]
     async fn test_sqlite_cache_with_client() {
-        let client = get_client_with_cache().expect("Requires API key");
+        let client = get_client_with_cache().await.expect("Requires API key");
 
         // First call - should hit API and cache the result
         let result1 = client
@@ -777,7 +776,7 @@ mod sqlite_cache_tests {
     #[tokio::test]
     #[ignore = "Requires API key"]
     async fn test_sqlite_cache_different_queries() {
-        let client = get_client_with_cache().expect("Requires API key");
+        let client = get_client_with_cache().await.expect("Requires API key");
 
         // Query 1: GCP SSD disk
         let result1 = client
@@ -807,7 +806,7 @@ mod sqlite_cache_tests {
     #[tokio::test]
     #[ignore = "Requires API key"]
     async fn test_sqlite_cache_multi_provider() {
-        let client = get_client_with_cache().expect("Requires API key");
+        let client = get_client_with_cache().await.expect("Requires API key");
 
         // Test caching works across different providers
         let gcp_result = client
@@ -891,14 +890,11 @@ mod postgres_cache_tests {
         })
     }
 
-    fn get_client_with_cache() -> Option<Client> {
+    async fn get_client_with_cache() -> Option<Client> {
         let _ = dotenvy::dotenv();
 
         let url = get_postgres_url();
-        let cache = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(PostgresCache::new(&url))
-            .ok()?;
+        let cache = PostgresCache::new(&url).await.ok()?;
 
         Client::builder()
             .api_key(std::env::var("INFRACOST_API_KEY").ok()?)
@@ -955,7 +951,9 @@ mod postgres_cache_tests {
     #[tokio::test]
     #[ignore = "Requires PostgreSQL and API key"]
     async fn test_postgres_cache_with_client() {
-        let client = get_client_with_cache().expect("Requires API key and PostgreSQL");
+        let client = get_client_with_cache()
+            .await
+            .expect("Requires API key and PostgreSQL");
 
         // First call - should hit API and cache the result
         let result1 = client
@@ -986,7 +984,9 @@ mod postgres_cache_tests {
     #[tokio::test]
     #[ignore = "Requires PostgreSQL and API key"]
     async fn test_postgres_cache_different_queries() {
-        let client = get_client_with_cache().expect("Requires API key and PostgreSQL");
+        let client = get_client_with_cache()
+            .await
+            .expect("Requires API key and PostgreSQL");
 
         // Query 1: GCP SSD disk
         let result1 = client
@@ -1016,7 +1016,9 @@ mod postgres_cache_tests {
     #[tokio::test]
     #[ignore = "Requires PostgreSQL and API key"]
     async fn test_postgres_cache_multi_provider() {
-        let client = get_client_with_cache().expect("Requires API key and PostgreSQL");
+        let client = get_client_with_cache()
+            .await
+            .expect("Requires API key and PostgreSQL");
 
         // Test caching works across different providers
         let gcp_result = client
