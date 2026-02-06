@@ -19,6 +19,15 @@
 //! }
 //! ```
 
+mod aws;
+mod azure;
+mod gcp;
+
+pub use aws::BlockingAwsProvider;
+pub use azure::BlockingAzureProvider;
+pub use gcp::BlockingGcpProvider;
+
+use crate::cache::PriceCache;
 use crate::error::{Error, Result};
 use crate::types::{Product, ProductFilter};
 use std::time::Duration;
@@ -85,6 +94,30 @@ impl Client {
         }
     }
 
+    /// Access GCP resource pricing with built-in defaults.
+    pub fn gcp(&self) -> BlockingGcpProvider {
+        BlockingGcpProvider {
+            client: self.inner.clone(),
+            runtime: self.runtime.clone(),
+        }
+    }
+
+    /// Access AWS resource pricing with built-in defaults.
+    pub fn aws(&self) -> BlockingAwsProvider {
+        BlockingAwsProvider {
+            client: self.inner.clone(),
+            runtime: self.runtime.clone(),
+        }
+    }
+
+    /// Access Azure resource pricing with built-in defaults.
+    pub fn azure(&self) -> BlockingAzureProvider {
+        BlockingAzureProvider {
+            client: self.inner.clone(),
+            runtime: self.runtime.clone(),
+        }
+    }
+
     /// Execute a raw query with a filter.
     pub fn query_products(&self, filter: ProductFilter) -> Result<Vec<Product>> {
         self.runtime.block_on(self.inner.query_products(filter))
@@ -123,6 +156,24 @@ impl ClientBuilder {
     /// Set the request timeout.
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.inner = self.inner.timeout(timeout);
+        self
+    }
+
+    /// Error instead of returning default prices when API is unavailable.
+    pub fn error_on_fallback(mut self, enabled: bool) -> Self {
+        self.inner = self.inner.error_on_fallback(enabled);
+        self
+    }
+
+    /// Enable caching with a custom cache implementation.
+    pub fn with_cache<C: PriceCache + 'static>(mut self, cache: C) -> Self {
+        self.inner = self.inner.with_cache(cache);
+        self
+    }
+
+    /// Set cache TTL (default: 24 hours).
+    pub fn cache_ttl(mut self, ttl: Duration) -> Self {
+        self.inner = self.inner.cache_ttl(ttl);
         self
     }
 
