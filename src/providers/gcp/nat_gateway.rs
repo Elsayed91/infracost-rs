@@ -2,12 +2,6 @@
 //!
 //! Supports both per-unit pricing and total monthly cost calculation.
 //!
-//! # API Limitation
-//!
-//! NOTE: GCP NAT Gateway pricing is not available in the Infracost API.
-//! The API will always fall back to default prices.
-//! Default prices are based on official GCP pricing documentation.
-//!
 //! # Per-unit pricing (hourly uptime)
 //! ```rust,no_run
 //! # use infracost_rs::Client;
@@ -40,10 +34,6 @@ use super::super::{PriceResult, PriceSource};
 // ============================================================
 // Defaults
 // ============================================================
-
-// NOTE: GCP NAT Gateway pricing is not available in the Infracost API.
-// The API will always fall back to default prices.
-// Default prices are based on official GCP pricing documentation.
 
 /// Default hourly price for NAT Gateway uptime
 const DEFAULT_HOURLY_PRICE: f64 = 0.0014;
@@ -135,7 +125,21 @@ impl<'a> NatGatewayBuilder<'a> {
             .await
         {
             Ok(products) if !products.is_empty() => {
-                let price = products[0].first_nonzero_price_or(default_price);
+                // Filter for NAT Gateway Uptime charge
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "description"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| v.starts_with("NAT Gateway: Uptime"))
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default_price))
+                    .unwrap_or(default_price);
                 Ok(PriceResult::from_api(price, UNIT))
             }
             Ok(_) if !self.client.error_on_fallback() => {
@@ -206,12 +210,13 @@ impl<'a> NatGatewayBuilder<'a> {
             return Ok(default);
         }
 
+        // Use resourceGroup for cross-region compatibility
         let filter = ProductFilter::builder()
             .vendor("gcp")
             .service("Compute Engine")
             .region(region)
             .product_family("Network")
-            .attribute_regex("description", "NAT Gateway: Uptime charge")
+            .attribute("resourceGroup", "NAT")
             .build();
 
         match self
@@ -219,7 +224,24 @@ impl<'a> NatGatewayBuilder<'a> {
             .query_products_with_key(filter, self.api_key.as_deref())
             .await
         {
-            Ok(products) if !products.is_empty() => Ok(products[0].first_nonzero_price_or(default)),
+            Ok(products) if !products.is_empty() => {
+                // Filter for NAT Gateway Uptime charge
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "description"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| v.starts_with("NAT Gateway: Uptime"))
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default))
+                    .unwrap_or(default);
+                Ok(price)
+            }
             _ if !self.client.error_on_fallback() => Ok(default),
             Err(e) => Err(e),
             Ok(_) => Err(crate::Error::no_products()),
@@ -235,12 +257,13 @@ impl<'a> NatGatewayBuilder<'a> {
             return Ok(default);
         }
 
+        // Use resourceGroup for cross-region compatibility
         let filter = ProductFilter::builder()
             .vendor("gcp")
             .service("Compute Engine")
             .region(region)
             .product_family("Network")
-            .attribute_regex("description", "NAT Gateway: Data processing charge")
+            .attribute("resourceGroup", "NAT")
             .build();
 
         match self
@@ -248,7 +271,24 @@ impl<'a> NatGatewayBuilder<'a> {
             .query_products_with_key(filter, self.api_key.as_deref())
             .await
         {
-            Ok(products) if !products.is_empty() => Ok(products[0].first_nonzero_price_or(default)),
+            Ok(products) if !products.is_empty() => {
+                // Filter for NAT Gateway Data processing charge
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "description"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| v.starts_with("NAT Gateway: Data processing"))
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default))
+                    .unwrap_or(default);
+                Ok(price)
+            }
             _ if !self.client.error_on_fallback() => Ok(default),
             Err(e) => Err(e),
             Ok(_) => Err(crate::Error::no_products()),
@@ -256,13 +296,14 @@ impl<'a> NatGatewayBuilder<'a> {
     }
 
     fn build_filter(&self) -> ProductFilter {
-        // Use regex to match "NAT Gateway: Uptime charge in <region>"
+        // Use resourceGroup for cross-region compatibility
+        // Returns all NAT Gateway products; code filtering selects the right one
         ProductFilter::builder()
             .vendor("gcp")
             .service("Compute Engine")
             .region(self.region.as_deref().unwrap_or("us-central1"))
             .product_family("Network")
-            .attribute_regex("description", "NAT Gateway: Uptime charge")
+            .attribute("resourceGroup", "NAT")
             .build()
     }
 }

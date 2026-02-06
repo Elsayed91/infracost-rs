@@ -99,7 +99,22 @@ impl<'a> NatGatewayBuilder<'a> {
             .await
         {
             Ok(products) if !products.is_empty() => {
-                let price = products[0].first_nonzero_price_or(default_price);
+                // Filter for NAT Gateway Hours charge (not Bytes)
+                // productFamily query returns both hourly and data processing charges
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "usagetype"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| v.ends_with("NatGateway-Hours"))
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default_price))
+                    .unwrap_or(default_price);
                 Ok(PriceResult::from_api(price, UNIT))
             }
             Ok(_) if !self.client.error_on_fallback() => {
@@ -114,11 +129,12 @@ impl<'a> NatGatewayBuilder<'a> {
     }
 
     fn build_filter(&self) -> ProductFilter {
+        // Use productFamily for cross-region compatibility
+        // usagetype varies by region (EU-NatGateway-Hours, APS1-NatGateway-Hours, etc.)
         ProductFilter::builder()
             .vendor("aws")
             .region(self.region.as_deref().unwrap_or("us-east-1"))
             .product_family("NAT Gateway")
-            .attribute("usagetype", "NatGateway-Hours")
             .build()
     }
 
@@ -183,11 +199,12 @@ impl<'a> NatGatewayBuilder<'a> {
             return Ok(default);
         }
 
+        // Use productFamily for cross-region compatibility
+        // usagetype varies by region (EU-NatGateway-Hours, etc.)
         let filter = ProductFilter::builder()
             .vendor("aws")
             .region(region)
             .product_family("NAT Gateway")
-            .attribute("usagetype", "NatGateway-Hours")
             .build();
 
         match self
@@ -195,7 +212,24 @@ impl<'a> NatGatewayBuilder<'a> {
             .query_products_with_key(filter, self.api_key.as_deref())
             .await
         {
-            Ok(products) if !products.is_empty() => Ok(products[0].first_nonzero_price_or(default)),
+            Ok(products) if !products.is_empty() => {
+                // Filter for NAT Gateway Hours charge (not Bytes)
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "usagetype"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| v.ends_with("NatGateway-Hours"))
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default))
+                    .unwrap_or(default);
+                Ok(price)
+            }
             _ if !self.client.error_on_fallback() => Ok(default),
             Err(e) => Err(e),
             Ok(_) => Err(crate::Error::no_products()),
@@ -211,11 +245,12 @@ impl<'a> NatGatewayBuilder<'a> {
             return Ok(default);
         }
 
+        // Use productFamily for cross-region compatibility
+        // usagetype varies by region (EU-NatGateway-Bytes, etc.)
         let filter = ProductFilter::builder()
             .vendor("aws")
             .region(region)
             .product_family("NAT Gateway")
-            .attribute("usagetype", "NatGateway-Bytes")
             .build();
 
         match self
@@ -223,7 +258,24 @@ impl<'a> NatGatewayBuilder<'a> {
             .query_products_with_key(filter, self.api_key.as_deref())
             .await
         {
-            Ok(products) if !products.is_empty() => Ok(products[0].first_nonzero_price_or(default)),
+            Ok(products) if !products.is_empty() => {
+                // Filter for NAT Gateway Bytes charge (not Hours)
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "usagetype"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| v.ends_with("NatGateway-Bytes"))
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default))
+                    .unwrap_or(default);
+                Ok(price)
+            }
             _ if !self.client.error_on_fallback() => Ok(default),
             Err(e) => Err(e),
             Ok(_) => Err(crate::Error::no_products()),

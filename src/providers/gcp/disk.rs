@@ -62,6 +62,15 @@ impl DiskType {
         }
     }
 
+    /// Get the resourceGroup for this disk type (more reliable for cross-region queries)
+    fn resource_group(&self) -> &'static str {
+        match self {
+            Self::PdStandard => "PDStandard",
+            // All SSD-based types share resourceGroup="SSD" in the API
+            Self::PdSsd | Self::PdBalanced | Self::PdExtreme => "SSD",
+        }
+    }
+
     /// Get the default storage price for this disk type (per GB-month)
     fn default_storage_price(&self) -> f64 {
         match self {
@@ -79,8 +88,10 @@ impl DiskType {
     }
 
     /// Get the unit for disk pricing
+    /// Note: GCP API returns prices in gibibyte (GiB), not gigabyte (GB)
+    /// 1 GiB = 1.073741824 GB
     fn unit(&self) -> &'static str {
-        "GB-month"
+        "GiB-month"
     }
 
     /// Whether this disk type supports provisioned IOPS
@@ -220,7 +231,23 @@ impl<'a> DiskBuilder<'a> {
             .await
         {
             Ok(products) if !products.is_empty() => {
-                let price = products[0].first_nonzero_price_or(default_price);
+                // Filter by description to get the correct product when multiple products
+                // share the same resourceGroup (e.g., all SSD-based types use resourceGroup="SSD")
+                let target_desc = self.disk_type.description();
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "description"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| v.starts_with(target_desc))
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default_price))
+                    .unwrap_or(default_price);
                 Ok(PriceResult::from_api(price, unit))
             }
             Ok(_) if !self.client.error_on_fallback() => {
@@ -268,25 +295,34 @@ impl<'a> DiskBuilder<'a> {
 
         let region = self.region.as_deref().unwrap_or("us-central1");
 
-        // Get price components
-        let storage_price = self.fetch_storage_price(region).await?;
-        let iops_price = self.fetch_iops_price(region).await?;
+        // Get price components with source tracking (Bug #2 fix)
+        let storage_result = self.fetch_storage_price(region).await?;
+        let iops_result = self.fetch_iops_price(region).await?;
 
         // Calculate storage cost
-        let storage_cost = size_gb as f64 * storage_price;
+        let storage_cost = size_gb as f64 * storage_result.price;
 
         // Calculate IOPS cost (only for pd-extreme)
         let iops_cost = if self.disk_type.supports_iops() {
             let provisioned_iops = self.iops.unwrap_or(0);
-            provisioned_iops as f64 * iops_price.unwrap_or(0.0)
+            if let Some(ref iops_price_result) = iops_result {
+                provisioned_iops as f64 * iops_price_result.price
+            } else {
+                0.0
+            }
         } else {
             0.0
         };
 
         let total = storage_cost + iops_cost;
 
-        // Determine source based on whether we got API prices
-        let source = if self.client.has_api_key() || self.api_key.is_some() {
+        // Determine source: only report Api if ALL components came from API (Bug #2 fix)
+        let source = if storage_result.is_from_api()
+            && (iops_result
+                .as_ref()
+                .map(|r| r.is_from_api())
+                .unwrap_or(true))
+        {
             PriceSource::Api
         } else {
             PriceSource::Default
@@ -299,21 +335,24 @@ impl<'a> DiskBuilder<'a> {
         })
     }
 
-    /// Fetch storage price per GB-month
-    async fn fetch_storage_price(&self, region: &str) -> Result<f64> {
+    /// Fetch storage price per GiB-month with source tracking
+    async fn fetch_storage_price(&self, region: &str) -> Result<PriceResult> {
         let default = self.disk_type.default_storage_price();
+        let unit = self.disk_type.unit();
 
+        // Early return with Default source if no API key
         if !self.client.has_api_key() && self.api_key.is_none() && !self.client.error_on_fallback()
         {
-            return Ok(default);
+            return Ok(PriceResult::from_default(default, unit));
         }
 
+        // Use resourceGroup for cross-region compatibility (Bug #1 fix)
         let filter = ProductFilter::builder()
             .vendor("gcp")
             .service("Compute Engine")
             .region(region)
             .product_family("Storage")
-            .attribute("description", self.disk_type.description())
+            .attribute("resourceGroup", self.disk_type.resource_group())
             .build();
 
         match self
@@ -321,15 +360,34 @@ impl<'a> DiskBuilder<'a> {
             .query_products_with_key(filter, self.api_key.as_deref())
             .await
         {
-            Ok(products) if !products.is_empty() => Ok(products[0].first_nonzero_price_or(default)),
-            _ if !self.client.error_on_fallback() => Ok(default),
+            Ok(products) if !products.is_empty() => {
+                // Filter by description to get the correct product when multiple products
+                // share the same resourceGroup (e.g., all SSD-based types use resourceGroup="SSD")
+                let target_desc = self.disk_type.description();
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "description"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| v.starts_with(target_desc))
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default))
+                    .unwrap_or(default);
+                Ok(PriceResult::from_api(price, unit))
+            }
+            _ if !self.client.error_on_fallback() => Ok(PriceResult::from_default(default, unit)),
             Err(e) => Err(e),
             Ok(_) => Err(crate::Error::no_products()),
         }
     }
 
-    /// Fetch IOPS price per IOPS-month (only for pd-extreme)
-    async fn fetch_iops_price(&self, region: &str) -> Result<Option<f64>> {
+    /// Fetch IOPS price per IOPS-month (only for pd-extreme) with source tracking
+    async fn fetch_iops_price(&self, region: &str) -> Result<Option<PriceResult>> {
         if !self.disk_type.supports_iops() {
             return Ok(None);
         }
@@ -338,9 +396,10 @@ impl<'a> DiskBuilder<'a> {
 
         if !self.client.has_api_key() && self.api_key.is_none() && !self.client.error_on_fallback()
         {
-            return Ok(default);
+            return Ok(default.map(|price| PriceResult::from_default(price, "IOPS-month")));
         }
 
+        // IOPS description is specific and consistent across regions
         let filter = ProductFilter::builder()
             .vendor("gcp")
             .service("Compute Engine")
@@ -354,22 +413,28 @@ impl<'a> DiskBuilder<'a> {
             .query_products_with_key(filter, self.api_key.as_deref())
             .await
         {
-            Ok(products) if !products.is_empty() => Ok(Some(
-                products[0].first_nonzero_price_or(default.unwrap_or(0.0)),
-            )),
-            _ if !self.client.error_on_fallback() => Ok(default),
+            Ok(products) if !products.is_empty() => {
+                let price = products[0].first_nonzero_price_or(default.unwrap_or(0.0));
+                Ok(Some(PriceResult::from_api(price, "IOPS-month")))
+            }
+            _ if !self.client.error_on_fallback() => {
+                Ok(default.map(|price| PriceResult::from_default(price, "IOPS-month")))
+            }
             Err(e) => Err(e),
-            Ok(_) => Ok(default),
+            Ok(_) => Ok(default.map(|price| PriceResult::from_default(price, "IOPS-month"))),
         }
     }
 
     fn build_filter(&self) -> ProductFilter {
+        // Use resourceGroup attribute instead of description for cross-region compatibility
+        // resourceGroup is consistent across regions (e.g., "SSD") while descriptions vary
+        // (e.g., "SSD backed PD Capacity" vs "SSD backed PD Capacity in Singapore")
         ProductFilter::builder()
             .vendor("gcp")
             .service("Compute Engine")
             .region(self.region.as_deref().unwrap_or("us-central1"))
             .product_family("Storage")
-            .attribute("description", self.disk_type.description())
+            .attribute("resourceGroup", self.disk_type.resource_group())
             .build()
     }
 }
@@ -418,7 +483,7 @@ mod tests {
 
         assert!(result.is_from_default());
         assert_eq!(result.price, 0.17);
-        assert_eq!(result.unit, "GB-month");
+        assert_eq!(result.unit, "GiB-month");
     }
 
     #[tokio::test]

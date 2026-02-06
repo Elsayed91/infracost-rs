@@ -121,7 +121,7 @@ impl<'a> StaticIpBuilder<'a> {
             .service("Compute Engine")
             .region(self.region.as_deref().unwrap_or("us-central1"))
             .product_family("Network")
-            .attribute("description", "Static Ip Charge")
+            .attribute("resourceGroup", "IpAddress") // Use resourceGroup for cross-region compatibility
             .build()
     }
 }

@@ -136,7 +136,22 @@ impl<'a> AlbBuilder<'a> {
             .await
         {
             Ok(products) if !products.is_empty() => {
-                let price = products[0].first_nonzero_price_or(default_price);
+                // Filter for LoadBalancerUsage (not LCUUsage)
+                // productFamily query returns both ALB hourly and LCU charges
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "usagetype"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| v.ends_with("LoadBalancerUsage"))
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default_price))
+                    .unwrap_or(default_price);
                 Ok(PriceResult::from_api(price, UNIT))
             }
             Ok(_) if !self.client.error_on_fallback() => {
@@ -210,10 +225,12 @@ impl<'a> AlbBuilder<'a> {
             return Ok(default);
         }
 
+        // Use productFamily + operation for cross-region compatibility
+        // usagetype varies by region (EU-LoadBalancerUsage, etc.)
         let filter = ProductFilter::builder()
             .vendor("aws")
             .region(region)
-            .attribute("usagetype", "LoadBalancerUsage")
+            .product_family("Load Balancer-Application")
             .attribute("operation", "LoadBalancing:Application")
             .build();
 
@@ -222,7 +239,25 @@ impl<'a> AlbBuilder<'a> {
             .query_products_with_key(filter, self.api_key.as_deref())
             .await
         {
-            Ok(products) if !products.is_empty() => Ok(products[0].first_nonzero_price_or(default)),
+            Ok(products) if !products.is_empty() => {
+                // Filter for LoadBalancerUsage (not LCUUsage)
+                // productFamily query returns both ALB hourly and LCU charges
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "usagetype"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| v.ends_with("LoadBalancerUsage"))
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default))
+                    .unwrap_or(default);
+                Ok(price)
+            }
             _ if !self.client.error_on_fallback() => Ok(default),
             Err(e) => Err(e),
             Ok(_) => Err(crate::Error::no_products()),
@@ -238,10 +273,12 @@ impl<'a> AlbBuilder<'a> {
             return Ok(default);
         }
 
+        // Use productFamily + operation for cross-region compatibility
+        // usagetype varies by region (EU-LCUUsage, etc.)
         let filter = ProductFilter::builder()
             .vendor("aws")
             .region(region)
-            .attribute("usagetype", "LCUUsage")
+            .product_family("Load Balancer-Application")
             .attribute("operation", "LoadBalancing:Application")
             .build();
 
@@ -250,7 +287,25 @@ impl<'a> AlbBuilder<'a> {
             .query_products_with_key(filter, self.api_key.as_deref())
             .await
         {
-            Ok(products) if !products.is_empty() => Ok(products[0].first_nonzero_price_or(default)),
+            Ok(products) if !products.is_empty() => {
+                // Filter for LCUUsage (not LoadBalancerUsage)
+                // productFamily query returns both ALB hourly and LCU charges
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "usagetype"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| v.ends_with("LCUUsage"))
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default))
+                    .unwrap_or(default);
+                Ok(price)
+            }
             _ if !self.client.error_on_fallback() => Ok(default),
             Err(e) => Err(e),
             Ok(_) => Err(crate::Error::no_products()),
@@ -258,11 +313,13 @@ impl<'a> AlbBuilder<'a> {
     }
 
     fn build_filter(&self) -> ProductFilter {
+        // Use productFamily for cross-region compatibility
+        // usagetype varies by region (EU-LoadBalancerUsage, APS1-LoadBalancerUsage, etc.)
         ProductFilter::builder()
             .vendor("aws")
             .region(self.region.as_deref().unwrap_or("us-east-1"))
             .product_family("Load Balancer-Application")
-            .attribute("usagetype", "LoadBalancerUsage")
+            .attribute("operation", "LoadBalancing:Application")
             .build()
     }
 }

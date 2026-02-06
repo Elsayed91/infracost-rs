@@ -125,7 +125,25 @@ impl<'a> ForwardingRuleBuilder<'a> {
             .await
         {
             Ok(products) if !products.is_empty() => {
-                let price = products[0].first_nonzero_price_or(default_price);
+                // Filter for Regional External Forwarding Rule Minimum
+                // (excludes Internal, Cross-Regional, and Global load balancers)
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "description"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| {
+                                    v.contains("Regional External")
+                                        && v.contains("Forwarding Rule Minimum")
+                                })
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default_price))
+                    .unwrap_or(default_price);
                 Ok(PriceResult::from_api(price, UNIT))
             }
             Ok(_) if !self.client.error_on_fallback() => {
@@ -196,14 +214,14 @@ impl<'a> ForwardingRuleBuilder<'a> {
             return Ok(default);
         }
 
-        // API uses "Networking" service with descriptions like:
-        // "Regional External Proxy Network Load Balancer Forwarding Rule Minimum for Iowa (us-central1)"
+        // Use resourceGroup for cross-region compatibility
+        // Filter for Regional External load balancers (most common use case)
         let filter = ProductFilter::builder()
             .vendor("gcp")
             .service("Networking")
             .region(region)
             .product_family("Network")
-            .attribute_regex("description", "Forwarding Rule Minimum")
+            .attribute("resourceGroup", "LoadBalancing")
             .build();
 
         match self
@@ -211,7 +229,28 @@ impl<'a> ForwardingRuleBuilder<'a> {
             .query_products_with_key(filter, self.api_key.as_deref())
             .await
         {
-            Ok(products) if !products.is_empty() => Ok(products[0].first_nonzero_price_or(default)),
+            Ok(products) if !products.is_empty() => {
+                // Filter for Regional External Forwarding Rule Minimum
+                // (excludes Internal, Cross-Regional, and Global load balancers)
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "description"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| {
+                                    v.contains("Regional External")
+                                        && v.contains("Forwarding Rule Minimum")
+                                })
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default))
+                    .unwrap_or(default);
+                Ok(price)
+            }
             _ if !self.client.error_on_fallback() => Ok(default),
             Err(e) => Err(e),
             Ok(_) => Err(crate::Error::no_products()),
@@ -227,15 +266,14 @@ impl<'a> ForwardingRuleBuilder<'a> {
             return Ok(default);
         }
 
-        // API uses "Networking" service with descriptions like:
-        // "Regional External Passthrough Network Load Balancer Outbound Data Processing for Iowa (us-central1)"
-        // or "Regional Internal Passthrough Network Load Balancer Outbound Data Processing"
+        // Use resourceGroup for cross-region compatibility
+        // Filter for Regional External Outbound data processing (most common use case)
         let filter = ProductFilter::builder()
             .vendor("gcp")
             .service("Networking")
             .region(region)
             .product_family("Network")
-            .attribute_regex("description", "Load Balancer.*Data Processing")
+            .attribute("resourceGroup", "LoadBalancing")
             .build();
 
         match self
@@ -243,7 +281,28 @@ impl<'a> ForwardingRuleBuilder<'a> {
             .query_products_with_key(filter, self.api_key.as_deref())
             .await
         {
-            Ok(products) if !products.is_empty() => Ok(products[0].first_nonzero_price_or(default)),
+            Ok(products) if !products.is_empty() => {
+                // Filter for Regional External Outbound Data Processing
+                // (excludes Internal, Inbound, Cross-Regional, and Global)
+                let matching_product = products.iter().find(|product| {
+                    product.attributes.iter().any(|attr| {
+                        attr.key == "description"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| {
+                                    v.contains("Regional External")
+                                        && v.contains("Outbound Data Processing")
+                                })
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = matching_product
+                    .map(|p| p.first_nonzero_price_or(default))
+                    .unwrap_or(default);
+                Ok(price)
+            }
             _ if !self.client.error_on_fallback() => Ok(default),
             Err(e) => Err(e),
             Ok(_) => Err(crate::Error::no_products()),
@@ -251,14 +310,14 @@ impl<'a> ForwardingRuleBuilder<'a> {
     }
 
     fn build_filter(&self) -> ProductFilter {
-        // API uses "Networking" service with descriptions like:
-        // "Regional External Proxy Network Load Balancer Forwarding Rule Minimum for Iowa (us-central1)"
+        // Use resourceGroup for cross-region compatibility
+        // Returns all load balancing products; code filtering selects the right one
         ProductFilter::builder()
             .vendor("gcp")
             .service("Networking")
             .region(self.region.as_deref().unwrap_or("us-central1"))
             .product_family("Network")
-            .attribute_regex("description", "Forwarding Rule Minimum")
+            .attribute("resourceGroup", "LoadBalancing")
             .build()
     }
 }

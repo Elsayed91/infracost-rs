@@ -106,7 +106,26 @@ impl<'a> SnapshotBuilder<'a> {
             .await
         {
             Ok(products) if !products.is_empty() => {
-                let price = products[0].first_nonzero_price_or(default_price);
+                // Filter for standard snapshot (not archive/outposts)
+                // productFamily query returns multiple snapshot types
+                let standard_snapshot = products.iter().find(|p| {
+                    p.attributes.iter().any(|attr| {
+                        attr.key == "usagetype"
+                            && attr
+                                .value
+                                .as_ref()
+                                .map(|v| {
+                                    v.ends_with("EBS:SnapshotUsage")
+                                        && !v.contains("Archive")
+                                        && !v.contains("outposts")
+                                })
+                                .unwrap_or(false)
+                    })
+                });
+
+                let price = standard_snapshot
+                    .map(|p| p.first_nonzero_price_or(default_price))
+                    .unwrap_or(default_price);
                 Ok(PriceResult::from_api(price, UNIT))
             }
             Ok(_) if !self.client.error_on_fallback() => {
@@ -121,10 +140,12 @@ impl<'a> SnapshotBuilder<'a> {
     }
 
     fn build_filter(&self) -> ProductFilter {
+        // Use productFamily for cross-region compatibility
+        // usagetype varies by region (EU-, APS1-, etc. prefixes)
         ProductFilter::builder()
             .vendor("aws")
             .region(self.region.as_deref().unwrap_or("us-east-1"))
-            .attribute("usagetype", "EBS:SnapshotUsage")
+            .product_family("Storage Snapshot")
             .attribute("servicecode", "AmazonEC2")
             .build()
     }

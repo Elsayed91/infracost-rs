@@ -98,7 +98,14 @@ impl<'a> ElasticIpBuilder<'a> {
             Ok(products) if !products.is_empty() => {
                 // EIP has tiered pricing - first hour free, then $0.005/hour
                 // We return the non-zero price (after first hour)
-                let price = products[0].first_nonzero_price_or(default_price);
+                // Note: With group="ElasticIP:Address", typically returns 1 product
+                // but using first_nonzero_price_or handles tiered pricing correctly
+                let price = if products.len() == 1 {
+                    products[0].first_nonzero_price_or(default_price)
+                } else {
+                    // If multiple products, use first (they should have same pricing)
+                    products[0].first_nonzero_price_or(default_price)
+                };
                 Ok(PriceResult::from_api(price, UNIT))
             }
             Ok(_) if !self.client.error_on_fallback() => {
@@ -113,11 +120,13 @@ impl<'a> ElasticIpBuilder<'a> {
     }
 
     fn build_filter(&self) -> ProductFilter {
+        // Use 'group' attribute for cross-region compatibility
+        // usagetype varies by region (EU-, APS1-, etc. prefixes)
         ProductFilter::builder()
             .vendor("aws")
             .region(self.region.as_deref().unwrap_or("us-east-1"))
             .product_family("IP Address")
-            .attribute("usagetype", "ElasticIP:IdleAddress")
+            .attribute("group", "ElasticIP:Address")
             .attribute("servicecode", "AmazonEC2")
             .build()
     }

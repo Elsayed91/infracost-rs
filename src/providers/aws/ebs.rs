@@ -369,10 +369,13 @@ impl<'a> EbsBuilder<'a> {
             return Ok(default);
         }
 
+        // Use volumeApiName for cross-region compatibility
+        // usagetype varies by region (EU-, APS1-, etc. prefixes)
         let filter = ProductFilter::builder()
             .vendor("aws")
             .region(region)
-            .attribute("usagetype", format!("EBS:VolumeUsage.{}", volume_type))
+            .product_family("Storage")
+            .attribute("volumeApiName", volume_type)
             .attribute("servicecode", "AmazonEC2")
             .build();
 
@@ -402,10 +405,13 @@ impl<'a> EbsBuilder<'a> {
             return Ok(default);
         }
 
+        // Use group attribute for cross-region compatibility
+        // usagetype varies by region (EU-, APS1-, etc. prefixes)
         let filter = ProductFilter::builder()
             .vendor("aws")
             .region(region)
-            .attribute("usagetype", format!("EBS:VolumeP-IOPS.{}", volume_type))
+            .attribute("group", "EBS IOPS")
+            .attribute("volumeApiName", volume_type)
             .attribute("servicecode", "AmazonEC2")
             .build();
 
@@ -435,11 +441,16 @@ impl<'a> EbsBuilder<'a> {
             return Ok((default_tier1, default_tier2, default_tier3));
         }
 
+        // Use group attribute for cross-region compatibility
+        // usagetype varies by region (EU-, APS1-, etc. prefixes)
+
         // Fetch tier 1 (1-32,000 IOPS)
         let filter_tier1 = ProductFilter::builder()
             .vendor("aws")
             .region(region)
-            .attribute("usagetype", "EBS:VolumeP-IOPS.io2")
+            .attribute("group", "EBS IOPS")
+            .attribute("volumeApiName", "io2")
+            .attribute_regex("description", ".*tier 1|^((?!tier).)*$") // tier 1 or no tier mentioned
             .attribute("servicecode", "AmazonEC2")
             .build();
 
@@ -447,7 +458,9 @@ impl<'a> EbsBuilder<'a> {
         let filter_tier2 = ProductFilter::builder()
             .vendor("aws")
             .region(region)
-            .attribute("usagetype", "EBS:VolumeP-IOPS.io2.tier2")
+            .attribute("group", "EBS IOPS")
+            .attribute("volumeApiName", "io2")
+            .attribute_regex("description", "tier 2")
             .attribute("servicecode", "AmazonEC2")
             .build();
 
@@ -455,7 +468,9 @@ impl<'a> EbsBuilder<'a> {
         let filter_tier3 = ProductFilter::builder()
             .vendor("aws")
             .region(region)
-            .attribute("usagetype", "EBS:VolumeP-IOPS.io2.tier3")
+            .attribute("group", "EBS IOPS")
+            .attribute("volumeApiName", "io2")
+            .attribute_regex("description", "tier 3")
             .attribute("servicecode", "AmazonEC2")
             .build();
 
@@ -540,13 +555,13 @@ impl<'a> EbsBuilder<'a> {
             return Ok(default);
         }
 
+        // Use volumeApiName for cross-region compatibility
+        // usagetype varies by region (EU-, APS1-, etc. prefixes)
         let filter = ProductFilter::builder()
             .vendor("aws")
             .region(region)
-            .attribute(
-                "usagetype",
-                format!("EBS:VolumeP-Throughput.{}", volume_type),
-            )
+            .attribute("group", "EBS Throughput")
+            .attribute("volumeApiName", volume_type)
             .attribute("servicecode", "AmazonEC2")
             .build();
 
