@@ -1,0 +1,19 @@
+- name: public-ip
+  display_name: "Public IP Address"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: uptime
+      is_primary: true
+      unit: hour
+      default_price: 0.005
+      query:
+        service: Virtual Network
+        product_family: Networking
+        attributes:
+          - { key: productName, value: IP Addresses }
+          - { key: meterName, value: Standard IPv4 Static Public IP }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: hourly_to_monthly

@@ -1,17 +1,11 @@
 //! GCP Static IP pricing.
 
-use crate::types::ProductFilter;
+use std::collections::HashMap;
+
+use crate::catalog::{engine::PricingEngine, gcp_catalog};
 use crate::{Client, Result};
 
 use super::super::PriceResult;
-
-// ============================================================
-// Defaults
-// ============================================================
-
-/// Default hourly price for static IP
-const DEFAULT_PRICE: f64 = 0.01;
-const UNIT: &str = "hour";
 
 // ============================================================
 // Builder
@@ -61,68 +55,33 @@ impl<'a> StaticIpBuilder<'a> {
 
     /// Fetch the full price result including source information.
     pub async fn fetch(self) -> Result<PriceResult> {
-        self.fetch_internal().await
+        let resource = gcp_catalog().find("static-ip")?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        PricingEngine::fetch(
+            self.client,
+            resource,
+            "gcp",
+            region,
+            self.api_key.as_deref(),
+            self.override_default,
+        )
+        .await
     }
 
-    /// Fetch monthly cost (hourly rate × 730 hours).
+    /// Fetch monthly cost (hourly rate x 730 hours).
     pub async fn fetch_monthly(self) -> Result<PriceResult> {
-        let hourly = self.fetch_internal().await?;
-        Ok(PriceResult {
-            price: hourly.price * 730.0,
-            unit: "month".to_string(),
-            source: hourly.source,
-        })
-    }
-
-    async fn fetch_internal(self) -> Result<PriceResult> {
-        let default_price = self.override_default.unwrap_or(DEFAULT_PRICE);
-
-        // Determine effective API key
-        let effective_key = self.api_key.as_deref().or_else(|| {
-            if self.client.has_api_key() {
-                Some("")
-            } else {
-                None
-            }
-        });
-
-        // No API key and not required → return default immediately
-        if effective_key.is_none() && !self.client.error_on_fallback() {
-            return Ok(PriceResult::from_default(default_price, UNIT));
-        }
-
-        // Try API
-        let filter = self.build_filter();
-        let api_key_for_query = self.api_key.as_deref();
-
-        match self
-            .client
-            .query_products_with_key(filter, api_key_for_query)
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                let price = products[0].first_nonzero_price_or(default_price);
-                Ok(PriceResult::from_api(price, UNIT))
-            }
-            Ok(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
-    }
-
-    fn build_filter(&self) -> ProductFilter {
-        ProductFilter::builder()
-            .vendor("gcp")
-            .service("Compute Engine")
-            .region(self.region.as_deref().unwrap_or("us-central1"))
-            .product_family("Network")
-            .attribute("resourceGroup", "IpAddress") // Use resourceGroup for cross-region compatibility
-            .build()
+        let resource = gcp_catalog().find("static-ip")?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        let params = HashMap::new();
+        PricingEngine::fetch_monthly(
+            self.client,
+            resource,
+            "gcp",
+            region,
+            self.api_key.as_deref(),
+            &params,
+        )
+        .await
     }
 }
 
@@ -158,7 +117,7 @@ mod tests {
             .unwrap();
 
         assert!(result.is_from_default());
-        // 0.01 × 730 = 7.30
+        // 0.01 x 730 = 7.30
         assert_eq!(result.price, 7.30);
         assert_eq!(result.unit, "month");
     }

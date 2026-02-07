@@ -76,6 +76,7 @@ mod query;
 mod types;
 
 pub mod cache;
+pub mod catalog;
 pub mod mock;
 pub mod providers;
 

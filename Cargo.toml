@@ -22,6 +22,95 @@ name = "irs"
 path = "src/bin/irs.rs"
 required-features = ["cli"]
 
+[[bin]]
+name = "validate-prices"
+path = "src/bin/validate_prices.rs"
+required-features = ["cli"]
+
+# GCP examples
+[[example]]
+name = "gcp_pd_standard"
+path = "examples/gcp/pd_standard.rs"
+[[example]]
+name = "gcp_pd_ssd"
+path = "examples/gcp/pd_ssd.rs"
+[[example]]
+name = "gcp_pd_balanced"
+path = "examples/gcp/pd_balanced.rs"
+[[example]]
+name = "gcp_pd_extreme"
+path = "examples/gcp/pd_extreme.rs"
+[[example]]
+name = "gcp_hyperdisk_balanced"
+path = "examples/gcp/hyperdisk_balanced.rs"
+[[example]]
+name = "gcp_hyperdisk_extreme"
+path = "examples/gcp/hyperdisk_extreme.rs"
+[[example]]
+name = "gcp_hyperdisk_throughput"
+path = "examples/gcp/hyperdisk_throughput.rs"
+[[example]]
+name = "gcp_hyperdisk_ml"
+path = "examples/gcp/hyperdisk_ml.rs"
+[[example]]
+name = "gcp_snapshot"
+path = "examples/gcp/snapshot.rs"
+[[example]]
+name = "gcp_static_ip"
+path = "examples/gcp/static_ip.rs"
+[[example]]
+name = "gcp_nat_gateway"
+path = "examples/gcp/nat_gateway.rs"
+[[example]]
+name = "gcp_forwarding_rule"
+path = "examples/gcp/forwarding_rule.rs"
+
+# AWS examples
+[[example]]
+name = "aws_ebs_gp3"
+path = "examples/aws/ebs_gp3.rs"
+[[example]]
+name = "aws_ebs_gp2"
+path = "examples/aws/ebs_gp2.rs"
+[[example]]
+name = "aws_ebs_io2"
+path = "examples/aws/ebs_io2.rs"
+[[example]]
+name = "aws_ebs_st1"
+path = "examples/aws/ebs_st1.rs"
+[[example]]
+name = "aws_ebs_sc1"
+path = "examples/aws/ebs_sc1.rs"
+[[example]]
+name = "aws_snapshot"
+path = "examples/aws/snapshot.rs"
+[[example]]
+name = "aws_elastic_ip"
+path = "examples/aws/elastic_ip.rs"
+[[example]]
+name = "aws_nat_gateway"
+path = "examples/aws/nat_gateway.rs"
+[[example]]
+name = "aws_alb"
+path = "examples/aws/alb.rs"
+
+# Azure examples
+[[example]]
+name = "azure_managed_disk_premium_ssd"
+path = "examples/azure/managed_disk_premium_ssd.rs"
+[[example]]
+name = "azure_managed_disk_standard_ssd"
+path = "examples/azure/managed_disk_standard_ssd.rs"
+[[example]]
+name = "azure_managed_disk_standard_hdd"
+path = "examples/azure/managed_disk_standard_hdd.rs"
+[[example]]
+name = "azure_snapshot"
+path = "examples/azure/snapshot.rs"
+[[example]]
+name = "azure_public_ip"
+path = "examples/azure/public_ip.rs"
+
 [dependencies]
 # GraphQL
 cynic = "3"
@@ -37,6 +126,9 @@ async-trait = "0.1"
 
 # Error handling
 thiserror = "2.0.18"
+
+# YAML catalog
+serde_yml = "0.0.12"
 
 # CLI (optional)
 clap = { version = "4", features = ["derive", "env"], optional = true }

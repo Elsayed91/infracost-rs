@@ -1,0 +1,32 @@
+- name: alb
+  display_name: "Application Load Balancer"
+  default_region: us-east-1
+  parameters:
+    - { name: lcu_hours, required_for_monthly: false }
+  cost_components:
+    - name: uptime
+      is_primary: true
+      unit: hour
+      default_price: 0.0225
+      query:
+        product_family: "Load Balancer-Application"
+        attributes:
+          - { key: operation, value: "LoadBalancing:Application" }
+      post_filter:
+        usagetype_ends_with: "LoadBalancerUsage"
+      pricing_model:
+        type: hourly_to_monthly
+
+    - name: lcu
+      is_primary: false
+      unit: LCU-hour
+      default_price: 0.008
+      query:
+        product_family: "Load Balancer-Application"
+        attributes:
+          - { key: operation, value: "LoadBalancing:Application" }
+      post_filter:
+        usagetype_ends_with: "LCUUsage"
+      pricing_model:
+        type: linear
+        quantity_param: lcu_hours

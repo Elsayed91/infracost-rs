@@ -1,0 +1,23 @@
+- name: snapshot
+  display_name: "EBS Snapshot"
+  default_region: us-east-1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.05
+      query:
+        service: AmazonEC2
+        product_family: "Storage Snapshot"
+        attributes:
+          - { key: servicecode, value: AmazonEC2 }
+      post_filter:
+        usagetype_ends_with: "EBS:SnapshotUsage"
+        usagetype_excludes:
+          - Archive
+          - outposts
+      pricing_model:
+        type: linear
+        quantity_param: size_gb

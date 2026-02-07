@@ -1,0 +1,20 @@
+- name: snapshot
+  display_name: "Storage PD Snapshot"
+  default_region: us-central1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.05
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: PDSnapshot }
+      post_filter:
+        description_starts_with: "Storage PD Snapshot"
+      pricing_model:
+        type: linear
+        quantity_param: size_gb

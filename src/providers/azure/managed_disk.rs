@@ -1,6 +1,6 @@
 //! Azure Managed Disk pricing.
 
-use crate::types::ProductFilter;
+use crate::catalog::{azure_catalog, engine::PricingEngine};
 use crate::{Client, Result};
 
 use super::super::PriceResult;
@@ -18,17 +18,6 @@ pub enum ManagedDiskType {
     StandardSsd,
     /// Standard HDD (S-series) - lowest cost
     StandardHdd,
-}
-
-impl ManagedDiskType {
-    /// Returns the API product name for this disk type
-    fn product_name(&self) -> &'static str {
-        match self {
-            Self::PremiumSsd => "Premium SSD Managed Disks",
-            Self::StandardSsd => "Standard SSD Managed Disks",
-            Self::StandardHdd => "Standard HDD Managed Disks",
-        }
-    }
 }
 
 impl std::str::FromStr for ManagedDiskType {
@@ -163,55 +152,18 @@ impl ManagedDiskSize {
         }
     }
 
-    /// Returns the SKU name for LRS (Locally Redundant Storage)
-    fn sku_name_lrs(&self) -> String {
-        format!("{} LRS", self.sku_prefix())
-    }
-
-    /// Returns the meter name for the disk
-    fn meter_name(&self) -> String {
-        format!("{} LRS Disk", self.sku_prefix())
-    }
-
-    /// Returns the default price for this disk size (USD/month)
-    fn default_price(&self) -> f64 {
-        match self {
-            // Premium SSD prices (eastus, as of 2024)
-            Self::P1 => 0.60,
-            Self::P2 => 1.20,
-            Self::P3 => 2.40,
-            Self::P4 => 4.80,
-            Self::P6 => 9.60,
-            Self::P10 => 19.71,
-            Self::P15 => 38.02,
-            Self::P20 => 73.22,
-            Self::P30 => 135.17,
-            Self::P40 => 259.05,
-            Self::P50 => 496.91,
-
-            // Standard SSD prices (eastus, as of 2024)
-            Self::E1 => 0.30,
-            Self::E2 => 0.60,
-            Self::E3 => 1.20,
-            Self::E4 => 2.40,
-            Self::E6 => 4.80,
-            Self::E10 => 9.60,
-            Self::E15 => 19.20,
-            Self::E20 => 38.40,
-            Self::E30 => 76.80,
-            Self::E40 => 153.60,
-            Self::E50 => 307.20,
-
-            // Standard HDD prices (eastus, as of 2024)
-            Self::S4 => 1.54,
-            Self::S6 => 3.01,
-            Self::S10 => 5.89,
-            Self::S15 => 11.33,
-            Self::S20 => 21.76,
-            Self::S30 => 40.96,
-            Self::S40 => 77.82,
-            Self::S50 => 143.36,
-        }
+    /// Returns the catalog resource name for this size and disk type.
+    fn resource_name(&self, disk_type: &ManagedDiskType) -> String {
+        let type_prefix = match disk_type {
+            ManagedDiskType::PremiumSsd => "premium-ssd",
+            ManagedDiskType::StandardSsd => "standard-ssd",
+            ManagedDiskType::StandardHdd => "standard-hdd",
+        };
+        format!(
+            "managed-disk/{}/{}",
+            type_prefix,
+            self.sku_prefix().to_lowercase()
+        )
     }
 }
 
@@ -267,8 +219,6 @@ impl From<&str> for ManagedDiskSize {
 // ============================================================
 // Builder
 // ============================================================
-
-const UNIT: &str = "month";
 
 /// Builder for querying Azure Managed Disk prices.
 pub struct ManagedDiskBuilder<'a> {
@@ -330,55 +280,18 @@ impl<'a> ManagedDiskBuilder<'a> {
 
     /// Fetch the full price result including source information.
     pub async fn fetch(self) -> Result<PriceResult> {
-        let default_price = self.override_default.unwrap_or(self.size.default_price());
-
-        let effective_key = self.api_key.as_deref().or_else(|| {
-            if self.client.has_api_key() {
-                Some("")
-            } else {
-                None
-            }
-        });
-
-        if effective_key.is_none() && !self.client.error_on_fallback() {
-            return Ok(PriceResult::from_default(default_price, UNIT));
-        }
-
-        let filter = self.build_filter();
-        let api_key_for_query = self.api_key.as_deref();
-
-        match self
-            .client
-            .query_products_with_key(filter, api_key_for_query)
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                // Filter for Consumption prices (not Reservation)
-                let price = products[0]
-                    .prices()
-                    .purchase_option("Consumption")
-                    .first_nonzero_f64_or(default_price);
-                Ok(PriceResult::from_api(price, UNIT))
-            }
-            Ok(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
-    }
-
-    fn build_filter(&self) -> ProductFilter {
-        ProductFilter::builder()
-            .vendor("azure")
-            .region(self.region.as_deref().unwrap_or("eastus"))
-            .attribute("productName", self.disk_type.product_name())
-            .attribute("skuName", self.size.sku_name_lrs())
-            .attribute("meterName", self.size.meter_name())
-            .build()
+        let resource_name = self.size.resource_name(&self.disk_type);
+        let resource = azure_catalog().find(&resource_name)?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        PricingEngine::fetch(
+            self.client,
+            resource,
+            "azure",
+            region,
+            self.api_key.as_deref(),
+            self.override_default,
+        )
+        .await
     }
 }
 
@@ -416,13 +329,6 @@ mod tests {
             "S50".parse::<ManagedDiskSize>().unwrap(),
             ManagedDiskSize::S50
         );
-    }
-
-    #[test]
-    fn test_managed_disk_defaults() {
-        assert_eq!(ManagedDiskSize::P10.default_price(), 19.71);
-        assert_eq!(ManagedDiskSize::E10.default_price(), 9.60);
-        assert_eq!(ManagedDiskSize::S10.default_price(), 5.89);
     }
 
     #[tokio::test]

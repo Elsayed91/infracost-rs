@@ -1,17 +1,10 @@
 //! Azure Public IP pricing.
 
-use crate::types::ProductFilter;
+use crate::catalog::azure_catalog;
+use crate::catalog::engine::PricingEngine;
 use crate::{Client, Result};
 
 use super::super::PriceResult;
-
-// ============================================================
-// Defaults
-// ============================================================
-
-/// Default hourly price for Standard static public IP
-const DEFAULT_PRICE: f64 = 0.005;
-const UNIT: &str = "hour";
 
 // ============================================================
 // Builder
@@ -61,67 +54,34 @@ impl<'a> PublicIpBuilder<'a> {
         self.fetch().await.map(|r| r.price)
     }
 
+    /// Fetch the full price result including source information.
+    pub async fn fetch(self) -> Result<PriceResult> {
+        let resource = azure_catalog().find("public-ip")?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        PricingEngine::fetch(
+            self.client,
+            resource,
+            "azure",
+            region,
+            self.api_key.as_deref(),
+            self.override_default,
+        )
+        .await
+    }
+
     /// Fetch the monthly price (hourly price * 730 hours).
     ///
     /// This is a convenience method for calculating monthly costs.
     pub async fn fetch_monthly(self) -> Result<PriceResult> {
-        let hourly = self.fetch().await?;
+        // Use fetch() to get hourly price (respects override_default), then multiply
+        let unit_result = self.fetch().await?;
+        let monthly_price = unit_result.price * 730.0;
+
         Ok(PriceResult {
-            price: hourly.price * 730.0,
+            price: monthly_price,
             unit: "month".to_string(),
-            source: hourly.source,
+            source: unit_result.source,
         })
-    }
-
-    /// Fetch the full price result including source information.
-    pub async fn fetch(self) -> Result<PriceResult> {
-        let default_price = self.override_default.unwrap_or(DEFAULT_PRICE);
-
-        let effective_key = self.api_key.as_deref().or_else(|| {
-            if self.client.has_api_key() {
-                Some("")
-            } else {
-                None
-            }
-        });
-
-        if effective_key.is_none() && !self.client.error_on_fallback() {
-            return Ok(PriceResult::from_default(default_price, UNIT));
-        }
-
-        let filter = self.build_filter();
-        let api_key_for_query = self.api_key.as_deref();
-
-        match self
-            .client
-            .query_products_with_key(filter, api_key_for_query)
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                let price = products[0]
-                    .prices()
-                    .purchase_option("Consumption")
-                    .first_nonzero_f64_or(default_price);
-                Ok(PriceResult::from_api(price, UNIT))
-            }
-            Ok(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
-    }
-
-    fn build_filter(&self) -> ProductFilter {
-        ProductFilter::builder()
-            .vendor("azure")
-            .region(self.region.as_deref().unwrap_or("eastus"))
-            .attribute("productName", "IP Addresses")
-            .attribute("meterName", "Standard IPv4 Static Public IP")
-            .build()
     }
 }
 

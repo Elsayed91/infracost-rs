@@ -1,0 +1,307 @@
+- name: disk/pd-standard
+  display_name: "Storage PD Capacity"
+  default_region: us-central1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GiB-month
+      default_price: 0.04
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: PDStandard }
+      post_filter:
+        description_starts_with: "Storage PD Capacity"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+
+- name: disk/pd-ssd
+  display_name: "SSD backed PD Capacity"
+  default_region: us-central1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GiB-month
+      default_price: 0.17
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_starts_with: "SSD backed PD Capacity"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+
+- name: disk/pd-balanced
+  display_name: "Balanced PD Capacity"
+  default_region: us-central1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GiB-month
+      default_price: 0.10
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_starts_with: "Balanced PD Capacity"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+
+- name: disk/pd-extreme
+  display_name: "Extreme PD Capacity"
+  default_region: us-central1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+    - { name: iops, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GiB-month
+      default_price: 0.125
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_starts_with: "Extreme PD Capacity"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+    - name: iops
+      is_primary: false
+      unit: IOPS-month
+      default_price: 0.065
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: description, value: "Extreme PD IOPS" }
+      pricing_model:
+        type: linear
+        quantity_param: iops
+
+- name: disk/hyperdisk-balanced
+  display_name: "Hyperdisk Balanced"
+  default_region: us-central1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+    - { name: iops, required_for_monthly: true }
+    - { name: throughput_mibps, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GiB-month
+      default_price: 0.08
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_starts_with: "Hyperdisk Balanced Capacity"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+    - name: iops
+      is_primary: false
+      unit: IOPS-month
+      default_price: 0.005
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_starts_with: "Hyperdisk Balanced IOPS"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: iops
+    - name: throughput
+      is_primary: false
+      unit: MiB/s-month
+      default_price: 0.04
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_starts_with: "Hyperdisk Balanced Throughput"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: throughput_mibps
+
+- name: disk/hyperdisk-extreme
+  display_name: "Hyperdisk Extreme"
+  default_region: us-central1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+    - { name: iops, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GiB-month
+      default_price: 0.125
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_starts_with: "Hyperdisk Extreme Capacity"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+    - name: iops
+      is_primary: false
+      unit: IOPS-month
+      default_price: 0.032
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_starts_with: "Hyperdisk Extreme IOPS"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: iops
+
+- name: disk/hyperdisk-throughput
+  display_name: "Hyperdisk Throughput"
+  default_region: us-central1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+    - { name: throughput_mibps, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GiB-month
+      default_price: 0.005
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_starts_with: "Hyperdisk Throughput Capacity"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+    - name: throughput
+      is_primary: false
+      unit: MiB/s-month
+      default_price: 0.25
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_starts_with: "Hyperdisk Throughput Throughput"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: throughput_mibps
+
+- name: disk/hyperdisk-ml
+  display_name: "Hyperdisk ML"
+  default_region: us-central1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+    - { name: throughput_mibps, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GiB-month
+      default_price: 0.08
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_starts_with: "Hyperdisk ML Capacity"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+    - name: throughput
+      is_primary: false
+      unit: MiB/s-month
+      default_price: 0.12
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_starts_with: "Hyperdisk ML Throughput"
+        description_excludes:
+          - "Confidential Mode"
+          - "High Availability"
+          - "Storage Pools"
+      pricing_model:
+        type: linear
+        quantity_param: throughput_mibps

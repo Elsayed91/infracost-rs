@@ -1,0 +1,15 @@
+- name: static-ip
+  display_name: "Static IP Address"
+  default_region: us-central1
+  cost_components:
+    - name: uptime
+      is_primary: true
+      unit: hour
+      default_price: 0.01
+      query:
+        service: "Compute Engine"
+        product_family: Network
+        attributes:
+          - { key: resourceGroup, value: IpAddress }
+      pricing_model:
+        type: hourly_to_monthly

@@ -26,20 +26,12 @@
 //! # }
 //! ```
 
-use crate::types::ProductFilter;
+use std::collections::HashMap;
+
+use crate::catalog::{engine::PricingEngine, gcp_catalog};
 use crate::{Client, Result};
 
-use super::super::{PriceResult, PriceSource};
-
-// ============================================================
-// Defaults
-// ============================================================
-
-/// Default hourly price for forwarding rule (minimum service charge)
-const DEFAULT_HOURLY_PRICE: f64 = 0.025;
-/// Default price for data processing (per GiB)
-const DEFAULT_DATA_PROCESSING_PRICE: f64 = 0.008;
-const UNIT: &str = "hour";
+use super::super::PriceResult;
 
 // ============================================================
 // Builder
@@ -99,62 +91,17 @@ impl<'a> ForwardingRuleBuilder<'a> {
     /// Fetch the full price result including source information.
     /// Returns the hourly uptime charge only (no data processing).
     pub async fn fetch(self) -> Result<PriceResult> {
-        let default_price = self.override_default.unwrap_or(DEFAULT_HOURLY_PRICE);
-
-        // Determine effective API key
-        let effective_key = self.api_key.as_deref().or_else(|| {
-            if self.client.has_api_key() {
-                Some("")
-            } else {
-                None
-            }
-        });
-
-        // No API key and not required → return default immediately
-        if effective_key.is_none() && !self.client.error_on_fallback() {
-            return Ok(PriceResult::from_default(default_price, UNIT));
-        }
-
-        // Try API
-        let filter = self.build_filter();
-        let api_key_for_query = self.api_key.as_deref();
-
-        match self
-            .client
-            .query_products_with_key(filter, api_key_for_query)
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                // Filter for Regional External Forwarding Rule Minimum
-                // (excludes Internal, Cross-Regional, and Global load balancers)
-                let matching_product = products.iter().find(|product| {
-                    product.attributes.iter().any(|attr| {
-                        attr.key == "description"
-                            && attr
-                                .value
-                                .as_ref()
-                                .map(|v| {
-                                    v.contains("Regional External")
-                                        && v.contains("Forwarding Rule Minimum")
-                                })
-                                .unwrap_or(false)
-                    })
-                });
-
-                let price = matching_product
-                    .map(|p| p.first_nonzero_price_or(default_price))
-                    .unwrap_or(default_price);
-                Ok(PriceResult::from_api(price, UNIT))
-            }
-            Ok(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
+        let resource = gcp_catalog().find("forwarding-rule")?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        PricingEngine::fetch(
+            self.client,
+            resource,
+            "gcp",
+            region,
+            self.api_key.as_deref(),
+            self.override_default,
+        )
+        .await
     }
 
     /// Fetch total monthly cost based on data processing usage.
@@ -175,150 +122,20 @@ impl<'a> ForwardingRuleBuilder<'a> {
     /// # }
     /// ```
     pub async fn fetch_monthly(self) -> Result<PriceResult> {
-        let region = self.region.as_deref().unwrap_or("us-central1");
-
-        // Get price components
-        let hourly_price = self.fetch_hourly_price(region).await?;
-        let data_price = self.fetch_data_processing_price(region).await?;
-
-        // Calculate costs
-        // 730 hours = average hours per month (365 days * 24 hours / 12 months)
-        let uptime_cost = hourly_price * 730.0;
-
-        // Data processing cost
+        let resource = gcp_catalog().find("forwarding-rule")?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
         let data_gb = self.data_processed_gb.unwrap_or(0);
-        let data_cost = data_gb as f64 * data_price;
-
-        let total = uptime_cost + data_cost;
-
-        // Determine source based on whether we got API prices
-        let source = if self.client.has_api_key() || self.api_key.is_some() {
-            PriceSource::Api
-        } else {
-            PriceSource::Default
-        };
-
-        Ok(PriceResult {
-            price: total,
-            unit: "month".to_string(),
-            source,
-        })
-    }
-
-    /// Fetch hourly uptime price
-    async fn fetch_hourly_price(&self, region: &str) -> Result<f64> {
-        let default = DEFAULT_HOURLY_PRICE;
-
-        if !self.client.has_api_key() && self.api_key.is_none() && !self.client.error_on_fallback()
-        {
-            return Ok(default);
-        }
-
-        // Use resourceGroup for cross-region compatibility
-        // Filter for Regional External load balancers (most common use case)
-        let filter = ProductFilter::builder()
-            .vendor("gcp")
-            .service("Networking")
-            .region(region)
-            .product_family("Network")
-            .attribute("resourceGroup", "LoadBalancing")
-            .build();
-
-        match self
-            .client
-            .query_products_with_key(filter, self.api_key.as_deref())
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                // Filter for Regional External Forwarding Rule Minimum
-                // (excludes Internal, Cross-Regional, and Global load balancers)
-                let matching_product = products.iter().find(|product| {
-                    product.attributes.iter().any(|attr| {
-                        attr.key == "description"
-                            && attr
-                                .value
-                                .as_ref()
-                                .map(|v| {
-                                    v.contains("Regional External")
-                                        && v.contains("Forwarding Rule Minimum")
-                                })
-                                .unwrap_or(false)
-                    })
-                });
-
-                let price = matching_product
-                    .map(|p| p.first_nonzero_price_or(default))
-                    .unwrap_or(default);
-                Ok(price)
-            }
-            _ if !self.client.error_on_fallback() => Ok(default),
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
-    }
-
-    /// Fetch data processing price per GiB
-    async fn fetch_data_processing_price(&self, region: &str) -> Result<f64> {
-        let default = DEFAULT_DATA_PROCESSING_PRICE;
-
-        if !self.client.has_api_key() && self.api_key.is_none() && !self.client.error_on_fallback()
-        {
-            return Ok(default);
-        }
-
-        // Use resourceGroup for cross-region compatibility
-        // Filter for Regional External Outbound data processing (most common use case)
-        let filter = ProductFilter::builder()
-            .vendor("gcp")
-            .service("Networking")
-            .region(region)
-            .product_family("Network")
-            .attribute("resourceGroup", "LoadBalancing")
-            .build();
-
-        match self
-            .client
-            .query_products_with_key(filter, self.api_key.as_deref())
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                // Filter for Regional External Outbound Data Processing
-                // (excludes Internal, Inbound, Cross-Regional, and Global)
-                let matching_product = products.iter().find(|product| {
-                    product.attributes.iter().any(|attr| {
-                        attr.key == "description"
-                            && attr
-                                .value
-                                .as_ref()
-                                .map(|v| {
-                                    v.contains("Regional External")
-                                        && v.contains("Outbound Data Processing")
-                                })
-                                .unwrap_or(false)
-                    })
-                });
-
-                let price = matching_product
-                    .map(|p| p.first_nonzero_price_or(default))
-                    .unwrap_or(default);
-                Ok(price)
-            }
-            _ if !self.client.error_on_fallback() => Ok(default),
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
-    }
-
-    fn build_filter(&self) -> ProductFilter {
-        // Use resourceGroup for cross-region compatibility
-        // Returns all load balancing products; code filtering selects the right one
-        ProductFilter::builder()
-            .vendor("gcp")
-            .service("Networking")
-            .region(self.region.as_deref().unwrap_or("us-central1"))
-            .product_family("Network")
-            .attribute("resourceGroup", "LoadBalancing")
-            .build()
+        let mut params = HashMap::new();
+        params.insert("data_processed_gb".to_string(), data_gb);
+        PricingEngine::fetch_monthly(
+            self.client,
+            resource,
+            "gcp",
+            region,
+            self.api_key.as_deref(),
+            &params,
+        )
+        .await
     }
 }
 

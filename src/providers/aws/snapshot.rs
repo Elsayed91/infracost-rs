@@ -1,16 +1,11 @@
 //! AWS EBS Snapshot pricing.
 
-use crate::types::ProductFilter;
+use std::collections::HashMap;
+
+use crate::catalog::{aws_catalog, engine::PricingEngine};
 use crate::{Client, Result};
 
 use super::super::PriceResult;
-
-// ============================================================
-// Defaults
-// ============================================================
-
-const DEFAULT_PRICE: f64 = 0.05;
-const UNIT: &str = "GB-month";
 
 // ============================================================
 // Builder
@@ -66,88 +61,41 @@ impl<'a> SnapshotBuilder<'a> {
         self.fetch().await.map(|r| r.price)
     }
 
-    /// Fetch the monthly cost (rate × size_gb).
+    /// Fetch the monthly cost (rate x size_gb).
     ///
     /// Requires `size_gb` to be set.
     pub async fn fetch_monthly(self) -> Result<PriceResult> {
         let size = self
             .size_gb
             .ok_or_else(|| crate::Error::validation("size_gb is required for fetch_monthly"))?;
-        let rate = self.fetch().await?;
-        Ok(PriceResult {
-            price: rate.price * size as f64,
-            unit: "month".to_string(),
-            source: rate.source,
-        })
+        let resource = aws_catalog().find("snapshot")?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        let mut params = HashMap::new();
+        params.insert("size_gb".to_string(), size);
+        PricingEngine::fetch_monthly(
+            self.client,
+            resource,
+            "aws",
+            region,
+            self.api_key.as_deref(),
+            &params,
+        )
+        .await
     }
 
     /// Fetch the full price result including source information.
     pub async fn fetch(self) -> Result<PriceResult> {
-        let default_price = self.override_default.unwrap_or(DEFAULT_PRICE);
-
-        let effective_key = self.api_key.as_deref().or_else(|| {
-            if self.client.has_api_key() {
-                Some("")
-            } else {
-                None
-            }
-        });
-
-        if effective_key.is_none() && !self.client.error_on_fallback() {
-            return Ok(PriceResult::from_default(default_price, UNIT));
-        }
-
-        let filter = self.build_filter();
-        let api_key_for_query = self.api_key.as_deref();
-
-        match self
-            .client
-            .query_products_with_key(filter, api_key_for_query)
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                // Filter for standard snapshot (not archive/outposts)
-                // productFamily query returns multiple snapshot types
-                let standard_snapshot = products.iter().find(|p| {
-                    p.attributes.iter().any(|attr| {
-                        attr.key == "usagetype"
-                            && attr
-                                .value
-                                .as_ref()
-                                .map(|v| {
-                                    v.ends_with("EBS:SnapshotUsage")
-                                        && !v.contains("Archive")
-                                        && !v.contains("outposts")
-                                })
-                                .unwrap_or(false)
-                    })
-                });
-
-                let price = standard_snapshot
-                    .map(|p| p.first_nonzero_price_or(default_price))
-                    .unwrap_or(default_price);
-                Ok(PriceResult::from_api(price, UNIT))
-            }
-            Ok(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
-    }
-
-    fn build_filter(&self) -> ProductFilter {
-        // Use productFamily for cross-region compatibility
-        // usagetype varies by region (EU-, APS1-, etc. prefixes)
-        ProductFilter::builder()
-            .vendor("aws")
-            .region(self.region.as_deref().unwrap_or("us-east-1"))
-            .product_family("Storage Snapshot")
-            .attribute("servicecode", "AmazonEC2")
-            .build()
+        let resource = aws_catalog().find("snapshot")?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        PricingEngine::fetch(
+            self.client,
+            resource,
+            "aws",
+            region,
+            self.api_key.as_deref(),
+            self.override_default,
+        )
+        .await
     }
 }
 

@@ -1,0 +1,167 @@
+- name: managed-disk/standard-hdd/s4
+  display_name: "Standard HDD Managed Disk S4"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 1.54
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard HDD Managed Disks }
+          - { key: skuName, value: S4 LRS }
+          - { key: meterName, value: S4 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-hdd/s6
+  display_name: "Standard HDD Managed Disk S6"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 3.01
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard HDD Managed Disks }
+          - { key: skuName, value: S6 LRS }
+          - { key: meterName, value: S6 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-hdd/s10
+  display_name: "Standard HDD Managed Disk S10"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 5.89
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard HDD Managed Disks }
+          - { key: skuName, value: S10 LRS }
+          - { key: meterName, value: S10 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-hdd/s15
+  display_name: "Standard HDD Managed Disk S15"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 11.33
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard HDD Managed Disks }
+          - { key: skuName, value: S15 LRS }
+          - { key: meterName, value: S15 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-hdd/s20
+  display_name: "Standard HDD Managed Disk S20"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 21.76
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard HDD Managed Disks }
+          - { key: skuName, value: S20 LRS }
+          - { key: meterName, value: S20 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-hdd/s30
+  display_name: "Standard HDD Managed Disk S30"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 40.96
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard HDD Managed Disks }
+          - { key: skuName, value: S30 LRS }
+          - { key: meterName, value: S30 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-hdd/s40
+  display_name: "Standard HDD Managed Disk S40"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 77.82
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard HDD Managed Disks }
+          - { key: skuName, value: S40 LRS }
+          - { key: meterName, value: S40 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-hdd/s50
+  display_name: "Standard HDD Managed Disk S50"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 143.36
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard HDD Managed Disks }
+          - { key: skuName, value: S50 LRS }
+          - { key: meterName, value: S50 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed

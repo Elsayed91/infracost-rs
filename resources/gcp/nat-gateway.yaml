@@ -1,0 +1,33 @@
+- name: nat-gateway
+  display_name: "NAT Gateway"
+  default_region: us-central1
+  parameters:
+    - { name: data_processed_gb, required_for_monthly: true }
+  cost_components:
+    - name: uptime
+      is_primary: true
+      unit: hour
+      default_price: 0.0014
+      query:
+        service: "Compute Engine"
+        product_family: Network
+        attributes:
+          - { key: resourceGroup, value: NAT }
+      post_filter:
+        description_starts_with: "NAT Gateway: Uptime"
+      pricing_model:
+        type: hourly_to_monthly
+    - name: data_processing
+      is_primary: false
+      unit: GiB
+      default_price: 0.045
+      query:
+        service: "Compute Engine"
+        product_family: Network
+        attributes:
+          - { key: resourceGroup, value: NAT }
+      post_filter:
+        description_starts_with: "NAT Gateway: Data processing"
+      pricing_model:
+        type: linear
+        quantity_param: data_processed_gb

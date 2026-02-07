@@ -29,10 +29,12 @@
 //! # }
 //! ```
 
-use crate::types::ProductFilter;
+use std::collections::HashMap;
+
+use crate::catalog::{engine::PricingEngine, gcp_catalog};
 use crate::{Client, Result};
 
-use super::super::{PriceResult, PriceSource};
+use super::super::PriceResult;
 
 // ============================================================
 // Types
@@ -49,61 +51,119 @@ pub enum DiskType {
     PdBalanced,
     /// Extreme persistent disk (highest IOPS)
     PdExtreme,
+    /// Hyperdisk Balanced (high performance balanced disk)
+    HyperdiskBalanced,
+    /// Hyperdisk Extreme (ultra-high performance with configurable IOPS)
+    HyperdiskExtreme,
+    /// Hyperdisk Throughput (optimized for high throughput workloads)
+    HyperdiskThroughput,
+    /// Hyperdisk ML (optimized for machine learning workloads)
+    HyperdiskMl,
 }
 
 impl DiskType {
+    /// Get the YAML catalog resource name for this disk type.
+    fn resource_name(&self) -> &'static str {
+        match self {
+            Self::PdStandard => "disk/pd-standard",
+            Self::PdSsd => "disk/pd-ssd",
+            Self::PdBalanced => "disk/pd-balanced",
+            Self::PdExtreme => "disk/pd-extreme",
+            Self::HyperdiskBalanced => "disk/hyperdisk-balanced",
+            Self::HyperdiskExtreme => "disk/hyperdisk-extreme",
+            Self::HyperdiskThroughput => "disk/hyperdisk-throughput",
+            Self::HyperdiskMl => "disk/hyperdisk-ml",
+        }
+    }
+
     /// Get the description pattern for this disk type (used for API filtering)
-    fn description(&self) -> &'static str {
+    pub fn description(&self) -> &'static str {
         match self {
             Self::PdStandard => "Storage PD Capacity",
             Self::PdSsd => "SSD backed PD Capacity",
             Self::PdBalanced => "Balanced PD Capacity",
             Self::PdExtreme => "Extreme PD Capacity",
+            Self::HyperdiskBalanced => "Hyperdisk Balanced Capacity",
+            Self::HyperdiskExtreme => "Hyperdisk Extreme Capacity",
+            Self::HyperdiskThroughput => "Hyperdisk Throughput Capacity",
+            Self::HyperdiskMl => "Hyperdisk ML Capacity",
         }
     }
 
     /// Get the resourceGroup for this disk type (more reliable for cross-region queries)
-    fn resource_group(&self) -> &'static str {
+    pub fn resource_group(&self) -> &'static str {
         match self {
             Self::PdStandard => "PDStandard",
-            // All SSD-based types share resourceGroup="SSD" in the API
-            Self::PdSsd | Self::PdBalanced | Self::PdExtreme => "SSD",
+            // All SSD-based types (PD and Hyperdisk) share resourceGroup="SSD" in the API
+            Self::PdSsd
+            | Self::PdBalanced
+            | Self::PdExtreme
+            | Self::HyperdiskBalanced
+            | Self::HyperdiskExtreme
+            | Self::HyperdiskThroughput
+            | Self::HyperdiskMl => "SSD",
         }
     }
 
     /// Get the default storage price for this disk type (per GB-month)
-    fn default_storage_price(&self) -> f64 {
+    pub fn default_storage_price(&self) -> f64 {
         match self {
             Self::PdStandard => 0.04,
             Self::PdSsd => 0.17,
             Self::PdBalanced => 0.10,
             Self::PdExtreme => 0.125,
+            Self::HyperdiskBalanced => 0.08,
+            Self::HyperdiskExtreme => 0.125,
+            Self::HyperdiskThroughput => 0.005,
+            Self::HyperdiskMl => 0.08,
         }
     }
 
     /// Get the default price for this disk type (per GB-month)
     /// Alias for default_storage_price for backward compatibility
-    fn default_price(&self) -> f64 {
+    pub fn default_price(&self) -> f64 {
         self.default_storage_price()
     }
 
     /// Get the unit for disk pricing
     /// Note: GCP API returns prices in gibibyte (GiB), not gigabyte (GB)
     /// 1 GiB = 1.073741824 GB
-    fn unit(&self) -> &'static str {
+    pub fn unit(&self) -> &'static str {
         "GiB-month"
     }
 
     /// Whether this disk type supports provisioned IOPS
     pub fn supports_iops(&self) -> bool {
-        matches!(self, Self::PdExtreme)
+        matches!(
+            self,
+            Self::PdExtreme | Self::HyperdiskBalanced | Self::HyperdiskExtreme
+        )
     }
 
     /// Get the default IOPS price (per IOPS-month)
-    /// Only pd-extreme supports provisioned IOPS
     pub fn default_iops_price(&self) -> Option<f64> {
         match self {
             Self::PdExtreme => Some(0.065),
+            Self::HyperdiskBalanced => Some(0.005),
+            Self::HyperdiskExtreme => Some(0.032),
+            _ => None,
+        }
+    }
+
+    /// Whether this disk type supports provisioned throughput
+    pub fn supports_throughput(&self) -> bool {
+        matches!(
+            self,
+            Self::HyperdiskBalanced | Self::HyperdiskThroughput | Self::HyperdiskMl
+        )
+    }
+
+    /// Get the default throughput price (per MiB/s-month)
+    pub fn default_throughput_price(&self) -> Option<f64> {
+        match self {
+            Self::HyperdiskBalanced => Some(0.04),
+            Self::HyperdiskThroughput => Some(0.25),
+            Self::HyperdiskMl => Some(0.12),
             _ => None,
         }
     }
@@ -115,6 +175,10 @@ impl From<&str> for DiskType {
             "pdssd" | "ssd" => Self::PdSsd,
             "pdbalanced" | "balanced" => Self::PdBalanced,
             "pdextreme" | "extreme" => Self::PdExtreme,
+            "hyperdiskbalanced" => Self::HyperdiskBalanced,
+            "hyperdiskextreme" => Self::HyperdiskExtreme,
+            "hyperdiskthroughput" => Self::HyperdiskThroughput,
+            "hyperdiskml" | "ml" => Self::HyperdiskMl,
             _ => Self::PdStandard,
         }
     }
@@ -140,6 +204,7 @@ pub struct DiskBuilder<'a> {
     // Volume specs for monthly cost calculation
     size_gb: Option<u64>,
     iops: Option<u64>,
+    throughput_mb_per_sec: Option<u64>,
 }
 
 impl<'a> DiskBuilder<'a> {
@@ -153,6 +218,7 @@ impl<'a> DiskBuilder<'a> {
             override_default: None,
             size_gb: None,
             iops: None,
+            throughput_mb_per_sec: None,
         }
     }
 
@@ -194,6 +260,18 @@ impl<'a> DiskBuilder<'a> {
         self
     }
 
+    /// Set provisioned throughput in MiB/s (for Hyperdisk types).
+    ///
+    /// Supported disk types and their throughput pricing:
+    /// - Hyperdisk Balanced: $0.04/MiB/s-month
+    /// - Hyperdisk Throughput: $0.25/MiB/s-month
+    /// - Hyperdisk ML: $0.12/MiB/s-month
+    /// For other disk types: throughput is ignored (not supported).
+    pub fn throughput(mut self, mb_per_sec: u64) -> Self {
+        self.throughput_mb_per_sec = Some(mb_per_sec);
+        self
+    }
+
     /// Fetch just the price value.
     pub async fn fetch_price(self) -> Result<f64> {
         self.fetch().await.map(|r| r.price)
@@ -201,80 +279,34 @@ impl<'a> DiskBuilder<'a> {
 
     /// Fetch the full price result including source information.
     pub async fn fetch(self) -> Result<PriceResult> {
-        let default_price = self
-            .override_default
-            .unwrap_or_else(|| self.disk_type.default_price());
-        let unit = self.disk_type.unit();
-
-        // Determine effective API key
-        let effective_key = self.api_key.as_deref().or_else(|| {
-            if self.client.has_api_key() {
-                // Client has a key, we'll use it via query_products
-                Some("")
-            } else {
-                None
-            }
-        });
-
-        // No API key and not required → return default immediately
-        if effective_key.is_none() && !self.client.error_on_fallback() {
-            return Ok(PriceResult::from_default(default_price, unit));
-        }
-
-        // Try API
-        let filter = self.build_filter();
-        let api_key_for_query = self.api_key.as_deref();
-
-        match self
-            .client
-            .query_products_with_key(filter, api_key_for_query)
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                // Filter by description to get the correct product when multiple products
-                // share the same resourceGroup (e.g., all SSD-based types use resourceGroup="SSD")
-                let target_desc = self.disk_type.description();
-                let matching_product = products.iter().find(|product| {
-                    product.attributes.iter().any(|attr| {
-                        attr.key == "description"
-                            && attr
-                                .value
-                                .as_ref()
-                                .map(|v| v.starts_with(target_desc))
-                                .unwrap_or(false)
-                    })
-                });
-
-                let price = matching_product
-                    .map(|p| p.first_nonzero_price_or(default_price))
-                    .unwrap_or(default_price);
-                Ok(PriceResult::from_api(price, unit))
-            }
-            Ok(_) if !self.client.error_on_fallback() => {
-                // No products found, use default
-                Ok(PriceResult::from_default(default_price, unit))
-            }
-            Err(_) if !self.client.error_on_fallback() => {
-                // API error, use default
-                Ok(PriceResult::from_default(default_price, unit))
-            }
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
+        let resource = gcp_catalog().find(self.disk_type.resource_name())?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        PricingEngine::fetch(
+            self.client,
+            resource,
+            "gcp",
+            region,
+            self.api_key.as_deref(),
+            self.override_default,
+        )
+        .await
     }
 
     /// Fetch total monthly cost based on disk specs.
     ///
-    /// Requires `size_gb()` to be set. Optionally set `iops()` for pd-extreme disks.
+    /// Requires `size_gb()` to be set. Optionally set:
+    /// - `iops()` for pd-extreme and hyperdisk types with IOPS support
+    /// - `throughput()` for hyperdisk types with throughput support
     ///
     /// The calculation:
-    /// - Storage cost = storage_price × size_gb
-    /// - IOPS cost (pd-extreme only) = iops_price × iops
-    /// - Total = storage_cost + iops_cost
+    /// - Storage cost = storage_price x size_gb
+    /// - IOPS cost = iops_price x iops (for supported types)
+    /// - Throughput cost = throughput_price x throughput (for supported types)
+    /// - Total = storage_cost + iops_cost + throughput_cost
     ///
-    /// For non-extreme disk types, IOPS is ignored as they don't support provisioned IOPS.
+    /// # Examples
     ///
-    /// # Example
+    /// pd-extreme with IOPS:
     /// ```rust,no_run
     /// # use infracost_rs::Client;
     /// # use infracost_rs::providers::gcp::DiskType;
@@ -288,154 +320,47 @@ impl<'a> DiskBuilder<'a> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// Hyperdisk Throughput with throughput:
+    /// ```rust,no_run
+    /// # use infracost_rs::Client;
+    /// # use infracost_rs::providers::gcp::DiskType;
+    /// # async fn example() -> infracost_rs::Result<()> {
+    /// let client = Client::new("api-key");
+    /// let cost = client.gcp().disk(DiskType::HyperdiskThroughput)
+    ///     .size_gb(1000)
+    ///     .throughput(500)  // 500 MiB/s
+    ///     .fetch_monthly().await?;
+    /// // Cost = (1000 * $0.005) + (500 * $0.25) = $5 + $125 = $130/month
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn fetch_monthly(self) -> Result<PriceResult> {
         let size_gb = self
             .size_gb
             .ok_or_else(|| crate::Error::validation("size_gb is required for fetch_monthly"))?;
 
-        let region = self.region.as_deref().unwrap_or("us-central1");
+        let resource = gcp_catalog().find(self.disk_type.resource_name())?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
 
-        // Get price components with source tracking (Bug #2 fix)
-        let storage_result = self.fetch_storage_price(region).await?;
-        let iops_result = self.fetch_iops_price(region).await?;
-
-        // Calculate storage cost
-        let storage_cost = size_gb as f64 * storage_result.price;
-
-        // Calculate IOPS cost (only for pd-extreme)
-        let iops_cost = if self.disk_type.supports_iops() {
-            let provisioned_iops = self.iops.unwrap_or(0);
-            if let Some(ref iops_price_result) = iops_result {
-                provisioned_iops as f64 * iops_price_result.price
-            } else {
-                0.0
-            }
-        } else {
-            0.0
-        };
-
-        let total = storage_cost + iops_cost;
-
-        // Determine source: only report Api if ALL components came from API (Bug #2 fix)
-        let source = if storage_result.is_from_api()
-            && (iops_result
-                .as_ref()
-                .map(|r| r.is_from_api())
-                .unwrap_or(true))
-        {
-            PriceSource::Api
-        } else {
-            PriceSource::Default
-        };
-
-        Ok(PriceResult {
-            price: total,
-            unit: "month".to_string(),
-            source,
-        })
-    }
-
-    /// Fetch storage price per GiB-month with source tracking
-    async fn fetch_storage_price(&self, region: &str) -> Result<PriceResult> {
-        let default = self.disk_type.default_storage_price();
-        let unit = self.disk_type.unit();
-
-        // Early return with Default source if no API key
-        if !self.client.has_api_key() && self.api_key.is_none() && !self.client.error_on_fallback()
-        {
-            return Ok(PriceResult::from_default(default, unit));
+        let mut params = HashMap::new();
+        params.insert("size_gb".to_string(), size_gb);
+        if let Some(iops) = self.iops {
+            params.insert("iops".to_string(), iops);
+        }
+        if let Some(throughput) = self.throughput_mb_per_sec {
+            params.insert("throughput_mibps".to_string(), throughput);
         }
 
-        // Use resourceGroup for cross-region compatibility (Bug #1 fix)
-        let filter = ProductFilter::builder()
-            .vendor("gcp")
-            .service("Compute Engine")
-            .region(region)
-            .product_family("Storage")
-            .attribute("resourceGroup", self.disk_type.resource_group())
-            .build();
-
-        match self
-            .client
-            .query_products_with_key(filter, self.api_key.as_deref())
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                // Filter by description to get the correct product when multiple products
-                // share the same resourceGroup (e.g., all SSD-based types use resourceGroup="SSD")
-                let target_desc = self.disk_type.description();
-                let matching_product = products.iter().find(|product| {
-                    product.attributes.iter().any(|attr| {
-                        attr.key == "description"
-                            && attr
-                                .value
-                                .as_ref()
-                                .map(|v| v.starts_with(target_desc))
-                                .unwrap_or(false)
-                    })
-                });
-
-                let price = matching_product
-                    .map(|p| p.first_nonzero_price_or(default))
-                    .unwrap_or(default);
-                Ok(PriceResult::from_api(price, unit))
-            }
-            _ if !self.client.error_on_fallback() => Ok(PriceResult::from_default(default, unit)),
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
-    }
-
-    /// Fetch IOPS price per IOPS-month (only for pd-extreme) with source tracking
-    async fn fetch_iops_price(&self, region: &str) -> Result<Option<PriceResult>> {
-        if !self.disk_type.supports_iops() {
-            return Ok(None);
-        }
-
-        let default = self.disk_type.default_iops_price();
-
-        if !self.client.has_api_key() && self.api_key.is_none() && !self.client.error_on_fallback()
-        {
-            return Ok(default.map(|price| PriceResult::from_default(price, "IOPS-month")));
-        }
-
-        // IOPS description is specific and consistent across regions
-        let filter = ProductFilter::builder()
-            .vendor("gcp")
-            .service("Compute Engine")
-            .region(region)
-            .product_family("Storage")
-            .attribute("description", "Extreme PD IOPS")
-            .build();
-
-        match self
-            .client
-            .query_products_with_key(filter, self.api_key.as_deref())
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                let price = products[0].first_nonzero_price_or(default.unwrap_or(0.0));
-                Ok(Some(PriceResult::from_api(price, "IOPS-month")))
-            }
-            _ if !self.client.error_on_fallback() => {
-                Ok(default.map(|price| PriceResult::from_default(price, "IOPS-month")))
-            }
-            Err(e) => Err(e),
-            Ok(_) => Ok(default.map(|price| PriceResult::from_default(price, "IOPS-month"))),
-        }
-    }
-
-    fn build_filter(&self) -> ProductFilter {
-        // Use resourceGroup attribute instead of description for cross-region compatibility
-        // resourceGroup is consistent across regions (e.g., "SSD") while descriptions vary
-        // (e.g., "SSD backed PD Capacity" vs "SSD backed PD Capacity in Singapore")
-        ProductFilter::builder()
-            .vendor("gcp")
-            .service("Compute Engine")
-            .region(self.region.as_deref().unwrap_or("us-central1"))
-            .product_family("Storage")
-            .attribute("resourceGroup", self.disk_type.resource_group())
-            .build()
+        PricingEngine::fetch_monthly(
+            self.client,
+            resource,
+            "gcp",
+            region,
+            self.api_key.as_deref(),
+            &params,
+        )
+        .await
     }
 }
 

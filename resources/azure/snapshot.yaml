@@ -1,0 +1,22 @@
+- name: snapshot
+  display_name: "Managed Disk Snapshot"
+  default_region: eastus
+  parameters:
+    - name: size_gb
+      required_for_monthly: true
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.05
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard HDD Managed Disks }
+          - { key: meterName, value: Snapshots LRS Snapshots }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: linear
+        quantity_param: size_gb

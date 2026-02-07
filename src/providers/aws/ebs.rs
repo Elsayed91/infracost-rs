@@ -28,10 +28,12 @@
 //! # }
 //! ```
 
-use crate::types::ProductFilter;
+use std::collections::HashMap;
+
+use crate::catalog::{aws_catalog, engine::PricingEngine};
 use crate::{Client, Result};
 
-use super::super::{PriceResult, PriceSource};
+use super::super::PriceResult;
 
 // ============================================================
 // Types
@@ -56,48 +58,14 @@ pub enum EbsType {
 }
 
 impl EbsType {
-    /// Get the volume API name for this EBS type
-    fn volume_api_name(&self) -> &'static str {
+    /// Get the resource name for looking up in the YAML catalog
+    fn resource_name(&self) -> &'static str {
         match self {
-            Self::Gp3 => "gp3",
-            Self::Gp2 => "gp2",
-            Self::Io2 => "io2",
-            Self::St1 => "st1",
-            Self::Sc1 => "sc1",
-        }
-    }
-
-    /// Get the default storage price for this EBS type (per GB-month)
-    fn default_storage_price(&self) -> f64 {
-        match self {
-            Self::Gp3 => 0.08,
-            Self::Gp2 => 0.10,
-            Self::Io2 => 0.125,
-            Self::St1 => 0.045,
-            Self::Sc1 => 0.015,
-        }
-    }
-
-    /// Get the default price for this EBS type (per GB-month)
-    /// Alias for default_storage_price for backward compatibility
-    fn default_price(&self) -> f64 {
-        self.default_storage_price()
-    }
-
-    /// Get the default IOPS price (per IOPS-month)
-    fn default_iops_price(&self) -> Option<f64> {
-        match self {
-            Self::Gp3 => Some(0.005),
-            Self::Io2 => Some(0.065), // tier 1 price
-            _ => None,
-        }
-    }
-
-    /// Get the default throughput price (per MiBps-month)
-    fn default_throughput_price(&self) -> Option<f64> {
-        match self {
-            Self::Gp3 => Some(0.04),
-            _ => None,
+            Self::Gp3 => "ebs/gp3",
+            Self::Gp2 => "ebs/gp2",
+            Self::Io2 => "ebs/io2",
+            Self::St1 => "ebs/st1",
+            Self::Sc1 => "ebs/sc1",
         }
     }
 
@@ -125,11 +93,6 @@ impl EbsType {
     /// Whether this volume type supports provisioned throughput
     fn supports_throughput(&self) -> bool {
         matches!(self, Self::Gp3)
-    }
-
-    /// Get the unit for EBS pricing
-    fn unit(&self) -> &'static str {
-        "GB-month"
     }
 }
 
@@ -232,47 +195,17 @@ impl<'a> EbsBuilder<'a> {
 
     /// Fetch the full price result including source information.
     pub async fn fetch(self) -> Result<PriceResult> {
-        let default_price = self
-            .override_default
-            .unwrap_or_else(|| self.ebs_type.default_price());
-        let unit = self.ebs_type.unit();
-
-        // Determine effective API key
-        let effective_key = self.api_key.as_deref().or_else(|| {
-            if self.client.has_api_key() {
-                Some("")
-            } else {
-                None
-            }
-        });
-
-        // No API key and not required → return default immediately
-        if effective_key.is_none() && !self.client.error_on_fallback() {
-            return Ok(PriceResult::from_default(default_price, unit));
-        }
-
-        // Try API
-        let filter = self.build_filter();
-        let api_key_for_query = self.api_key.as_deref();
-
-        match self
-            .client
-            .query_products_with_key(filter, api_key_for_query)
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                let price = products[0].first_nonzero_price_or(default_price);
-                Ok(PriceResult::from_api(price, unit))
-            }
-            Ok(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, unit))
-            }
-            Err(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, unit))
-            }
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
+        let resource = aws_catalog().find(self.ebs_type.resource_name())?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        PricingEngine::fetch(
+            self.client,
+            resource,
+            "aws",
+            region,
+            self.api_key.as_deref(),
+            self.override_default,
+        )
+        .await
     }
 
     /// Fetch total monthly cost based on volume specs.
@@ -303,293 +236,46 @@ impl<'a> EbsBuilder<'a> {
             .size_gb
             .ok_or_else(|| crate::Error::validation("size_gb is required for fetch_monthly"))?;
 
-        let region = self.region.as_deref().unwrap_or("us-east-1");
-        let volume_type = self.ebs_type.volume_api_name();
+        let resource = aws_catalog().find(self.ebs_type.resource_name())?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
 
-        // Get price components
-        let storage_price = self.fetch_storage_price(region, volume_type).await?;
-        let throughput_price = self.fetch_throughput_price(region, volume_type).await?;
+        let mut params = HashMap::new();
+        params.insert("size_gb".to_string(), size_gb);
 
-        // Calculate storage cost
-        let storage_cost = size_gb as f64 * storage_price;
-
-        // Calculate IOPS cost
-        let iops_cost = if self.ebs_type.supports_iops() {
-            let provisioned_iops = self.iops.unwrap_or(self.ebs_type.baseline_iops());
-            let billable_iops = provisioned_iops.saturating_sub(self.ebs_type.baseline_iops());
-
-            if self.ebs_type == EbsType::Io2 && billable_iops > 0 {
-                // io2 uses tiered pricing
-                let (tier1_price, tier2_price, tier3_price) =
-                    self.fetch_io2_tiered_iops_price(region).await?;
-                Self::calculate_io2_iops_cost(billable_iops, tier1_price, tier2_price, tier3_price)
-            } else {
-                // gp3 uses flat pricing
-                let iops_price = self.fetch_iops_price(region, volume_type).await?;
-                billable_iops as f64 * iops_price.unwrap_or(0.0)
-            }
-        } else {
-            0.0
-        };
-
-        // Calculate throughput cost (subtract baseline for gp3)
-        let throughput_cost = if self.ebs_type.supports_throughput() {
-            let provisioned_throughput = self
+        // For gp3: IOPS defaults to baseline 3000, throughput defaults to baseline 125
+        // For io2: IOPS defaults to 0 (no baseline)
+        if self.ebs_type.supports_iops() {
+            let iops = self.iops.unwrap_or(self.ebs_type.baseline_iops());
+            params.insert("iops".to_string(), iops);
+        }
+        if self.ebs_type.supports_throughput() {
+            let throughput = self
                 .throughput_mibps
                 .unwrap_or(self.ebs_type.baseline_throughput_mibps());
-            let billable_throughput =
-                provisioned_throughput.saturating_sub(self.ebs_type.baseline_throughput_mibps());
-            billable_throughput as f64 * throughput_price.unwrap_or(0.0)
+            params.insert("throughput_mibps".to_string(), throughput);
+        }
+
+        if self.ebs_type == EbsType::Io2 {
+            PricingEngine::fetch_monthly_with_tiered_queries(
+                self.client,
+                resource,
+                "aws",
+                region,
+                self.api_key.as_deref(),
+                &params,
+            )
+            .await
         } else {
-            0.0
-        };
-
-        let total = storage_cost + iops_cost + throughput_cost;
-
-        // Determine source based on whether we got API prices
-        let source = if self.client.has_api_key() || self.api_key.is_some() {
-            PriceSource::Api
-        } else {
-            PriceSource::Default
-        };
-
-        Ok(PriceResult {
-            price: total,
-            unit: "month".to_string(),
-            source,
-        })
-    }
-
-    /// Fetch storage price per GB-month
-    async fn fetch_storage_price(&self, region: &str, volume_type: &str) -> Result<f64> {
-        let default = self.ebs_type.default_storage_price();
-
-        if !self.client.has_api_key() && self.api_key.is_none() && !self.client.error_on_fallback()
-        {
-            return Ok(default);
-        }
-
-        // Use volumeApiName for cross-region compatibility
-        // usagetype varies by region (EU-, APS1-, etc. prefixes)
-        let filter = ProductFilter::builder()
-            .vendor("aws")
-            .region(region)
-            .product_family("Storage")
-            .attribute("volumeApiName", volume_type)
-            .attribute("servicecode", "AmazonEC2")
-            .build();
-
-        match self
-            .client
-            .query_products_with_key(filter, self.api_key.as_deref())
+            PricingEngine::fetch_monthly(
+                self.client,
+                resource,
+                "aws",
+                region,
+                self.api_key.as_deref(),
+                &params,
+            )
             .await
-        {
-            Ok(products) if !products.is_empty() => Ok(products[0].first_nonzero_price_or(default)),
-            _ if !self.client.error_on_fallback() => Ok(default),
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
         }
-    }
-
-    /// Fetch IOPS price per IOPS-month
-    /// For io2, this returns only the tier 1 price. Use fetch_io2_tiered_iops_price for full tiered calculation.
-    async fn fetch_iops_price(&self, region: &str, volume_type: &str) -> Result<Option<f64>> {
-        if !self.ebs_type.supports_iops() {
-            return Ok(None);
-        }
-
-        let default = self.ebs_type.default_iops_price();
-
-        if !self.client.has_api_key() && self.api_key.is_none() && !self.client.error_on_fallback()
-        {
-            return Ok(default);
-        }
-
-        // Use group attribute for cross-region compatibility
-        // usagetype varies by region (EU-, APS1-, etc. prefixes)
-        let filter = ProductFilter::builder()
-            .vendor("aws")
-            .region(region)
-            .attribute("group", "EBS IOPS")
-            .attribute("volumeApiName", volume_type)
-            .attribute("servicecode", "AmazonEC2")
-            .build();
-
-        match self
-            .client
-            .query_products_with_key(filter, self.api_key.as_deref())
-            .await
-        {
-            Ok(products) if !products.is_empty() => Ok(Some(
-                products[0].first_nonzero_price_or(default.unwrap_or(0.0)),
-            )),
-            _ if !self.client.error_on_fallback() => Ok(default),
-            Err(e) => Err(e),
-            Ok(_) => Ok(default),
-        }
-    }
-
-    /// Fetch all three tiers of io2 IOPS pricing
-    async fn fetch_io2_tiered_iops_price(&self, region: &str) -> Result<(f64, f64, f64)> {
-        // Default prices for the three tiers
-        let default_tier1 = 0.065;
-        let default_tier2 = 0.0455;
-        let default_tier3 = 0.03185;
-
-        if !self.client.has_api_key() && self.api_key.is_none() && !self.client.error_on_fallback()
-        {
-            return Ok((default_tier1, default_tier2, default_tier3));
-        }
-
-        // Use group attribute for cross-region compatibility
-        // usagetype varies by region (EU-, APS1-, etc. prefixes)
-
-        // Fetch tier 1 (1-32,000 IOPS)
-        let filter_tier1 = ProductFilter::builder()
-            .vendor("aws")
-            .region(region)
-            .attribute("group", "EBS IOPS")
-            .attribute("volumeApiName", "io2")
-            .attribute_regex("description", ".*tier 1|^((?!tier).)*$") // tier 1 or no tier mentioned
-            .attribute("servicecode", "AmazonEC2")
-            .build();
-
-        // Fetch tier 2 (32,001-64,000 IOPS)
-        let filter_tier2 = ProductFilter::builder()
-            .vendor("aws")
-            .region(region)
-            .attribute("group", "EBS IOPS")
-            .attribute("volumeApiName", "io2")
-            .attribute_regex("description", "tier 2")
-            .attribute("servicecode", "AmazonEC2")
-            .build();
-
-        // Fetch tier 3 (64,001+ IOPS)
-        let filter_tier3 = ProductFilter::builder()
-            .vendor("aws")
-            .region(region)
-            .attribute("group", "EBS IOPS")
-            .attribute("volumeApiName", "io2")
-            .attribute_regex("description", "tier 3")
-            .attribute("servicecode", "AmazonEC2")
-            .build();
-
-        let tier1_price = match self
-            .client
-            .query_products_with_key(filter_tier1, self.api_key.as_deref())
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                products[0].first_nonzero_price_or(default_tier1)
-            }
-            _ => default_tier1,
-        };
-
-        let tier2_price = match self
-            .client
-            .query_products_with_key(filter_tier2, self.api_key.as_deref())
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                products[0].first_nonzero_price_or(default_tier2)
-            }
-            _ => default_tier2,
-        };
-
-        let tier3_price = match self
-            .client
-            .query_products_with_key(filter_tier3, self.api_key.as_deref())
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                products[0].first_nonzero_price_or(default_tier3)
-            }
-            _ => default_tier3,
-        };
-
-        Ok((tier1_price, tier2_price, tier3_price))
-    }
-
-    /// Calculate io2 IOPS cost with tiered pricing
-    fn calculate_io2_iops_cost(
-        iops: u64,
-        tier1_price: f64,
-        tier2_price: f64,
-        tier3_price: f64,
-    ) -> f64 {
-        let mut cost = 0.0;
-        let mut remaining = iops;
-
-        // Tier 1: 1-32,000 IOPS at tier1_price
-        if remaining > 0 {
-            let tier1_iops = remaining.min(32000);
-            cost += tier1_iops as f64 * tier1_price;
-            remaining = remaining.saturating_sub(32000);
-        }
-
-        // Tier 2: 32,001-64,000 IOPS at tier2_price
-        if remaining > 0 {
-            let tier2_iops = remaining.min(32000);
-            cost += tier2_iops as f64 * tier2_price;
-            remaining = remaining.saturating_sub(32000);
-        }
-
-        // Tier 3: 64,001+ IOPS at tier3_price
-        if remaining > 0 {
-            cost += remaining as f64 * tier3_price;
-        }
-
-        cost
-    }
-
-    /// Fetch throughput price per MiBps-month
-    async fn fetch_throughput_price(&self, region: &str, volume_type: &str) -> Result<Option<f64>> {
-        if !self.ebs_type.supports_throughput() {
-            return Ok(None);
-        }
-
-        let default = self.ebs_type.default_throughput_price();
-
-        if !self.client.has_api_key() && self.api_key.is_none() && !self.client.error_on_fallback()
-        {
-            return Ok(default);
-        }
-
-        // Use volumeApiName for cross-region compatibility
-        // usagetype varies by region (EU-, APS1-, etc. prefixes)
-        let filter = ProductFilter::builder()
-            .vendor("aws")
-            .region(region)
-            .attribute("group", "EBS Throughput")
-            .attribute("volumeApiName", volume_type)
-            .attribute("servicecode", "AmazonEC2")
-            .build();
-
-        match self
-            .client
-            .query_products_with_key(filter, self.api_key.as_deref())
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                // API returns price in GiBps, convert to MiBps (divide by 1024)
-                let price_gibps =
-                    products[0].first_nonzero_price_or(default.unwrap_or(0.0) * 1024.0);
-                Ok(Some(price_gibps / 1024.0))
-            }
-            _ if !self.client.error_on_fallback() => Ok(default),
-            Err(e) => Err(e),
-            Ok(_) => Ok(default),
-        }
-    }
-
-    fn build_filter(&self) -> ProductFilter {
-        ProductFilter::builder()
-            .vendor("aws")
-            .region(self.region.as_deref().unwrap_or("us-east-1"))
-            .product_family("Storage")
-            .attribute("volumeApiName", self.ebs_type.volume_api_name())
-            .attribute("servicecode", "AmazonEC2")
-            .build()
     }
 }
 
@@ -606,24 +292,6 @@ mod tests {
         assert_eq!(EbsType::from("st1"), EbsType::St1);
         assert_eq!(EbsType::from("sc1"), EbsType::Sc1);
         assert_eq!(EbsType::from("unknown"), EbsType::Gp3);
-    }
-
-    #[test]
-    fn test_ebs_type_defaults() {
-        assert_eq!(EbsType::Gp3.default_price(), 0.08);
-        assert_eq!(EbsType::Gp2.default_price(), 0.10);
-        assert_eq!(EbsType::Io2.default_price(), 0.125);
-        assert_eq!(EbsType::St1.default_price(), 0.045);
-        assert_eq!(EbsType::Sc1.default_price(), 0.015);
-    }
-
-    #[test]
-    fn test_ebs_type_volume_api_name() {
-        assert_eq!(EbsType::Gp3.volume_api_name(), "gp3");
-        assert_eq!(EbsType::Gp2.volume_api_name(), "gp2");
-        assert_eq!(EbsType::Io2.volume_api_name(), "io2");
-        assert_eq!(EbsType::St1.volume_api_name(), "st1");
-        assert_eq!(EbsType::Sc1.volume_api_name(), "sc1");
     }
 
     #[tokio::test]
@@ -792,45 +460,6 @@ mod tests {
         assert!(!EbsType::Io2.supports_throughput());
         assert!(!EbsType::Gp2.supports_iops());
         assert!(!EbsType::Gp2.supports_throughput());
-    }
-
-    #[test]
-    fn test_io2_tiered_iops_calculation() {
-        // Tier 1 only: 10,000 IOPS
-        // Cost = 10,000 * $0.065 = $650
-        let cost = EbsBuilder::calculate_io2_iops_cost(10000, 0.065, 0.0455, 0.03185);
-        assert_eq!(cost, 650.0);
-
-        // Tier 1 + Tier 2: 50,000 IOPS
-        // Cost = (32,000 * $0.065) + (18,000 * $0.0455) = $2,080 + $819 = $2,899
-        let cost = EbsBuilder::calculate_io2_iops_cost(50000, 0.065, 0.0455, 0.03185);
-        assert_eq!(cost, 2899.0);
-
-        // All 3 tiers: 100,000 IOPS
-        // Cost = (32,000 * $0.065) + (32,000 * $0.0455) + (36,000 * $0.03185)
-        //      = $2,080 + $1,456 + $1,146.6 = $4,682.6
-        let cost = EbsBuilder::calculate_io2_iops_cost(100000, 0.065, 0.0455, 0.03185);
-        assert_eq!(cost, 4682.6);
-
-        // Exactly at tier boundary: 32,000 IOPS
-        // Cost = 32,000 * $0.065 = $2,080
-        let cost = EbsBuilder::calculate_io2_iops_cost(32000, 0.065, 0.0455, 0.03185);
-        assert_eq!(cost, 2080.0);
-
-        // Just over tier 1: 32,001 IOPS
-        // Cost = (32,000 * $0.065) + (1 * $0.0455) = $2,080 + $0.0455 = $2,080.0455
-        let cost = EbsBuilder::calculate_io2_iops_cost(32001, 0.065, 0.0455, 0.03185);
-        assert_eq!(cost, 2080.0455);
-
-        // Exactly at tier 2 boundary: 64,000 IOPS
-        // Cost = (32,000 * $0.065) + (32,000 * $0.0455) = $2,080 + $1,456 = $3,536
-        let cost = EbsBuilder::calculate_io2_iops_cost(64000, 0.065, 0.0455, 0.03185);
-        assert_eq!(cost, 3536.0);
-
-        // Just over tier 2: 64,001 IOPS
-        // Cost = (32,000 * $0.065) + (32,000 * $0.0455) + (1 * $0.03185) = $3,536.03185
-        let cost = EbsBuilder::calculate_io2_iops_cost(64001, 0.065, 0.0455, 0.03185);
-        assert_eq!(cost, 3536.03185);
     }
 
     #[tokio::test]

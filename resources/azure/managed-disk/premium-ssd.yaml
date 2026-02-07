@@ -1,0 +1,230 @@
+- name: managed-disk/premium-ssd/p1
+  display_name: "Premium SSD Managed Disk P1"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 0.60
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Premium SSD Managed Disks }
+          - { key: skuName, value: P1 LRS }
+          - { key: meterName, value: P1 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/premium-ssd/p2
+  display_name: "Premium SSD Managed Disk P2"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 1.20
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Premium SSD Managed Disks }
+          - { key: skuName, value: P2 LRS }
+          - { key: meterName, value: P2 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/premium-ssd/p3
+  display_name: "Premium SSD Managed Disk P3"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 2.40
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Premium SSD Managed Disks }
+          - { key: skuName, value: P3 LRS }
+          - { key: meterName, value: P3 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/premium-ssd/p4
+  display_name: "Premium SSD Managed Disk P4"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 4.80
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Premium SSD Managed Disks }
+          - { key: skuName, value: P4 LRS }
+          - { key: meterName, value: P4 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/premium-ssd/p6
+  display_name: "Premium SSD Managed Disk P6"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 9.60
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Premium SSD Managed Disks }
+          - { key: skuName, value: P6 LRS }
+          - { key: meterName, value: P6 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/premium-ssd/p10
+  display_name: "Premium SSD Managed Disk P10"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 19.71
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Premium SSD Managed Disks }
+          - { key: skuName, value: P10 LRS }
+          - { key: meterName, value: P10 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/premium-ssd/p15
+  display_name: "Premium SSD Managed Disk P15"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 38.02
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Premium SSD Managed Disks }
+          - { key: skuName, value: P15 LRS }
+          - { key: meterName, value: P15 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/premium-ssd/p20
+  display_name: "Premium SSD Managed Disk P20"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 73.22
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Premium SSD Managed Disks }
+          - { key: skuName, value: P20 LRS }
+          - { key: meterName, value: P20 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/premium-ssd/p30
+  display_name: "Premium SSD Managed Disk P30"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 135.17
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Premium SSD Managed Disks }
+          - { key: skuName, value: P30 LRS }
+          - { key: meterName, value: P30 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/premium-ssd/p40
+  display_name: "Premium SSD Managed Disk P40"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 259.05
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Premium SSD Managed Disks }
+          - { key: skuName, value: P40 LRS }
+          - { key: meterName, value: P40 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/premium-ssd/p50
+  display_name: "Premium SSD Managed Disk P50"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 496.91
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Premium SSD Managed Disks }
+          - { key: skuName, value: P50 LRS }
+          - { key: meterName, value: P50 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed

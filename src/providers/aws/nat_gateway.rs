@@ -1,17 +1,11 @@
 //! AWS NAT Gateway pricing.
 
-use crate::types::ProductFilter;
+use std::collections::HashMap;
+
+use crate::catalog::{aws_catalog, engine::PricingEngine};
 use crate::{Client, Result};
 
-use super::super::{PriceResult, PriceSource};
-
-// ============================================================
-// Defaults
-// ============================================================
-
-/// Default hourly price for NAT Gateway
-const DEFAULT_PRICE: f64 = 0.045;
-const UNIT: &str = "hour";
+use super::super::PriceResult;
 
 // ============================================================
 // Builder
@@ -76,66 +70,17 @@ impl<'a> NatGatewayBuilder<'a> {
 
     /// Fetch the full price result including source information.
     pub async fn fetch(self) -> Result<PriceResult> {
-        let default_price = self.override_default.unwrap_or(DEFAULT_PRICE);
-
-        let effective_key = self.api_key.as_deref().or_else(|| {
-            if self.client.has_api_key() {
-                Some("")
-            } else {
-                None
-            }
-        });
-
-        if effective_key.is_none() && !self.client.error_on_fallback() {
-            return Ok(PriceResult::from_default(default_price, UNIT));
-        }
-
-        let filter = self.build_filter();
-        let api_key_for_query = self.api_key.as_deref();
-
-        match self
-            .client
-            .query_products_with_key(filter, api_key_for_query)
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                // Filter for NAT Gateway Hours charge (not Bytes)
-                // productFamily query returns both hourly and data processing charges
-                let matching_product = products.iter().find(|product| {
-                    product.attributes.iter().any(|attr| {
-                        attr.key == "usagetype"
-                            && attr
-                                .value
-                                .as_ref()
-                                .map(|v| v.ends_with("NatGateway-Hours"))
-                                .unwrap_or(false)
-                    })
-                });
-
-                let price = matching_product
-                    .map(|p| p.first_nonzero_price_or(default_price))
-                    .unwrap_or(default_price);
-                Ok(PriceResult::from_api(price, UNIT))
-            }
-            Ok(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
-    }
-
-    fn build_filter(&self) -> ProductFilter {
-        // Use productFamily for cross-region compatibility
-        // usagetype varies by region (EU-NatGateway-Hours, APS1-NatGateway-Hours, etc.)
-        ProductFilter::builder()
-            .vendor("aws")
-            .region(self.region.as_deref().unwrap_or("us-east-1"))
-            .product_family("NAT Gateway")
-            .build()
+        let resource = aws_catalog().find("nat-gateway")?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        PricingEngine::fetch(
+            self.client,
+            resource,
+            "aws",
+            region,
+            self.api_key.as_deref(),
+            self.override_default,
+        )
+        .await
     }
 
     /// Fetch total monthly cost for NAT Gateway.
@@ -158,128 +103,21 @@ impl<'a> NatGatewayBuilder<'a> {
     /// # }
     /// ```
     pub async fn fetch_monthly(self) -> Result<PriceResult> {
-        let region = self.region.as_deref().unwrap_or("us-east-1");
-
-        // Get price components
-        let hourly_price = self.fetch_hourly_price(region).await?;
-        let data_price = self.fetch_data_processing_price(region).await?;
-
-        // Calculate hourly cost for 730 hours/month
-        let hourly_cost = hourly_price * 730.0;
-
-        // Calculate data processing cost
-        let data_cost = if let Some(gb) = self.data_processed_gb {
-            gb as f64 * data_price
-        } else {
-            0.0
-        };
-
-        let total = hourly_cost + data_cost;
-
-        // Determine source based on whether we have API key
-        let source = if self.client.has_api_key() || self.api_key.is_some() {
-            PriceSource::Api
-        } else {
-            PriceSource::Default
-        };
-
-        Ok(PriceResult {
-            price: total,
-            unit: "month".to_string(),
-            source,
-        })
-    }
-
-    /// Fetch hourly price for NAT Gateway
-    async fn fetch_hourly_price(&self, region: &str) -> Result<f64> {
-        let default = DEFAULT_PRICE;
-
-        if !self.client.has_api_key() && self.api_key.is_none() && !self.client.error_on_fallback()
-        {
-            return Ok(default);
+        let resource = aws_catalog().find("nat-gateway")?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        let mut params = HashMap::new();
+        if let Some(gb) = self.data_processed_gb {
+            params.insert("data_processed_gb".to_string(), gb);
         }
-
-        // Use productFamily for cross-region compatibility
-        // usagetype varies by region (EU-NatGateway-Hours, etc.)
-        let filter = ProductFilter::builder()
-            .vendor("aws")
-            .region(region)
-            .product_family("NAT Gateway")
-            .build();
-
-        match self
-            .client
-            .query_products_with_key(filter, self.api_key.as_deref())
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                // Filter for NAT Gateway Hours charge (not Bytes)
-                let matching_product = products.iter().find(|product| {
-                    product.attributes.iter().any(|attr| {
-                        attr.key == "usagetype"
-                            && attr
-                                .value
-                                .as_ref()
-                                .map(|v| v.ends_with("NatGateway-Hours"))
-                                .unwrap_or(false)
-                    })
-                });
-
-                let price = matching_product
-                    .map(|p| p.first_nonzero_price_or(default))
-                    .unwrap_or(default);
-                Ok(price)
-            }
-            _ if !self.client.error_on_fallback() => Ok(default),
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
-    }
-
-    /// Fetch data processing price per GB
-    async fn fetch_data_processing_price(&self, region: &str) -> Result<f64> {
-        let default = DEFAULT_PRICE; // Same as hourly: $0.045/GB
-
-        if !self.client.has_api_key() && self.api_key.is_none() && !self.client.error_on_fallback()
-        {
-            return Ok(default);
-        }
-
-        // Use productFamily for cross-region compatibility
-        // usagetype varies by region (EU-NatGateway-Bytes, etc.)
-        let filter = ProductFilter::builder()
-            .vendor("aws")
-            .region(region)
-            .product_family("NAT Gateway")
-            .build();
-
-        match self
-            .client
-            .query_products_with_key(filter, self.api_key.as_deref())
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                // Filter for NAT Gateway Bytes charge (not Hours)
-                let matching_product = products.iter().find(|product| {
-                    product.attributes.iter().any(|attr| {
-                        attr.key == "usagetype"
-                            && attr
-                                .value
-                                .as_ref()
-                                .map(|v| v.ends_with("NatGateway-Bytes"))
-                                .unwrap_or(false)
-                    })
-                });
-
-                let price = matching_product
-                    .map(|p| p.first_nonzero_price_or(default))
-                    .unwrap_or(default);
-                Ok(price)
-            }
-            _ if !self.client.error_on_fallback() => Ok(default),
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
+        PricingEngine::fetch_monthly(
+            self.client,
+            resource,
+            "aws",
+            region,
+            self.api_key.as_deref(),
+            &params,
+        )
+        .await
     }
 }
 

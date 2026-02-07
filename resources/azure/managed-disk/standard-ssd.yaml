@@ -1,0 +1,230 @@
+- name: managed-disk/standard-ssd/e1
+  display_name: "Standard SSD Managed Disk E1"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 0.30
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard SSD Managed Disks }
+          - { key: skuName, value: E1 LRS }
+          - { key: meterName, value: E1 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-ssd/e2
+  display_name: "Standard SSD Managed Disk E2"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 0.60
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard SSD Managed Disks }
+          - { key: skuName, value: E2 LRS }
+          - { key: meterName, value: E2 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-ssd/e3
+  display_name: "Standard SSD Managed Disk E3"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 1.20
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard SSD Managed Disks }
+          - { key: skuName, value: E3 LRS }
+          - { key: meterName, value: E3 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-ssd/e4
+  display_name: "Standard SSD Managed Disk E4"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 2.40
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard SSD Managed Disks }
+          - { key: skuName, value: E4 LRS }
+          - { key: meterName, value: E4 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-ssd/e6
+  display_name: "Standard SSD Managed Disk E6"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 4.80
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard SSD Managed Disks }
+          - { key: skuName, value: E6 LRS }
+          - { key: meterName, value: E6 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-ssd/e10
+  display_name: "Standard SSD Managed Disk E10"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 9.60
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard SSD Managed Disks }
+          - { key: skuName, value: E10 LRS }
+          - { key: meterName, value: E10 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-ssd/e15
+  display_name: "Standard SSD Managed Disk E15"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 19.20
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard SSD Managed Disks }
+          - { key: skuName, value: E15 LRS }
+          - { key: meterName, value: E15 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-ssd/e20
+  display_name: "Standard SSD Managed Disk E20"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 38.40
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard SSD Managed Disks }
+          - { key: skuName, value: E20 LRS }
+          - { key: meterName, value: E20 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-ssd/e30
+  display_name: "Standard SSD Managed Disk E30"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 76.80
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard SSD Managed Disks }
+          - { key: skuName, value: E30 LRS }
+          - { key: meterName, value: E30 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-ssd/e40
+  display_name: "Standard SSD Managed Disk E40"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 153.60
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard SSD Managed Disks }
+          - { key: skuName, value: E40 LRS }
+          - { key: meterName, value: E40 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+- name: managed-disk/standard-ssd/e50
+  display_name: "Standard SSD Managed Disk E50"
+  default_region: eastus
+  parameters: []
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: month
+      default_price: 307.20
+      query:
+        service: Storage
+        product_family: Storage
+        attributes:
+          - { key: productName, value: Standard SSD Managed Disks }
+          - { key: skuName, value: E50 LRS }
+          - { key: meterName, value: E50 LRS Disk }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed

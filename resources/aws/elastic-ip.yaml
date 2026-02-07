@@ -1,0 +1,17 @@
+- name: elastic-ip
+  display_name: "Elastic IP Address"
+  default_region: us-east-1
+  parameters: []
+  cost_components:
+    - name: uptime
+      is_primary: true
+      unit: hour
+      default_price: 0.005
+      query:
+        service: AmazonEC2
+        product_family: "IP Address"
+        attributes:
+          - { key: group, value: "ElasticIP:Address" }
+          - { key: servicecode, value: AmazonEC2 }
+      pricing_model:
+        type: hourly_to_monthly

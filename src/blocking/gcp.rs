@@ -585,7 +585,7 @@ mod tests {
 
         assert!(result.is_from_default());
         assert_eq!(result.price, 0.17);
-        assert_eq!(result.unit, "GB-month");
+        assert_eq!(result.unit, "GiB-month");
     }
 
     #[test]

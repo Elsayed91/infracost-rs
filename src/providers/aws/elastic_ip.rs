@@ -1,17 +1,11 @@
 //! AWS Elastic IP pricing.
 
-use crate::types::ProductFilter;
+use std::collections::HashMap;
+
+use crate::catalog::{aws_catalog, engine::PricingEngine};
 use crate::{Client, Result};
 
 use super::super::PriceResult;
-
-// ============================================================
-// Defaults
-// ============================================================
-
-/// Default hourly price for idle/unused Elastic IP
-const DEFAULT_PRICE: f64 = 0.005;
-const UNIT: &str = "hour";
 
 // ============================================================
 // Builder
@@ -61,74 +55,35 @@ impl<'a> ElasticIpBuilder<'a> {
         self.fetch().await.map(|r| r.price)
     }
 
-    /// Fetch the monthly price (hourly price × 730 hours).
+    /// Fetch the monthly price (hourly price x 730 hours).
     pub async fn fetch_monthly(self) -> Result<PriceResult> {
-        let hourly = self.fetch().await?;
-        Ok(PriceResult {
-            price: hourly.price * 730.0,
-            unit: "month".to_string(),
-            source: hourly.source,
-        })
+        let resource = aws_catalog().find("elastic-ip")?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        let params = HashMap::new();
+        PricingEngine::fetch_monthly(
+            self.client,
+            resource,
+            "aws",
+            region,
+            self.api_key.as_deref(),
+            &params,
+        )
+        .await
     }
 
     /// Fetch the full price result including source information.
     pub async fn fetch(self) -> Result<PriceResult> {
-        let default_price = self.override_default.unwrap_or(DEFAULT_PRICE);
-
-        let effective_key = self.api_key.as_deref().or_else(|| {
-            if self.client.has_api_key() {
-                Some("")
-            } else {
-                None
-            }
-        });
-
-        if effective_key.is_none() && !self.client.error_on_fallback() {
-            return Ok(PriceResult::from_default(default_price, UNIT));
-        }
-
-        let filter = self.build_filter();
-        let api_key_for_query = self.api_key.as_deref();
-
-        match self
-            .client
-            .query_products_with_key(filter, api_key_for_query)
-            .await
-        {
-            Ok(products) if !products.is_empty() => {
-                // EIP has tiered pricing - first hour free, then $0.005/hour
-                // We return the non-zero price (after first hour)
-                // Note: With group="ElasticIP:Address", typically returns 1 product
-                // but using first_nonzero_price_or handles tiered pricing correctly
-                let price = if products.len() == 1 {
-                    products[0].first_nonzero_price_or(default_price)
-                } else {
-                    // If multiple products, use first (they should have same pricing)
-                    products[0].first_nonzero_price_or(default_price)
-                };
-                Ok(PriceResult::from_api(price, UNIT))
-            }
-            Ok(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(_) if !self.client.error_on_fallback() => {
-                Ok(PriceResult::from_default(default_price, UNIT))
-            }
-            Err(e) => Err(e),
-            Ok(_) => Err(crate::Error::no_products()),
-        }
-    }
-
-    fn build_filter(&self) -> ProductFilter {
-        // Use 'group' attribute for cross-region compatibility
-        // usagetype varies by region (EU-, APS1-, etc. prefixes)
-        ProductFilter::builder()
-            .vendor("aws")
-            .region(self.region.as_deref().unwrap_or("us-east-1"))
-            .product_family("IP Address")
-            .attribute("group", "ElasticIP:Address")
-            .attribute("servicecode", "AmazonEC2")
-            .build()
+        let resource = aws_catalog().find("elastic-ip")?;
+        let region = self.region.as_deref().unwrap_or(&resource.default_region);
+        PricingEngine::fetch(
+            self.client,
+            resource,
+            "aws",
+            region,
+            self.api_key.as_deref(),
+            self.override_default,
+        )
+        .await
     }
 }
 

@@ -1,0 +1,161 @@
+- name: ebs/gp3
+  display_name: "General Purpose SSD (gp3)"
+  default_region: us-east-1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.08
+      query:
+        service: AmazonEC2
+        product_family: Storage
+        attributes:
+          - { key: volumeApiName, value: gp3 }
+          - { key: servicecode, value: AmazonEC2 }
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+
+    - name: iops
+      is_primary: false
+      unit: IOPS-month
+      default_price: 0.005
+      query:
+        attributes:
+          - { key: group, value: "EBS IOPS" }
+          - { key: volumeApiName, value: gp3 }
+          - { key: servicecode, value: AmazonEC2 }
+      pricing_model:
+        type: linear_with_baseline
+        quantity_param: iops
+        baseline: 3000
+
+    - name: throughput
+      is_primary: false
+      unit: MiBps-month
+      default_price: 0.04
+      query:
+        attributes:
+          - { key: group, value: "EBS Throughput" }
+          - { key: volumeApiName, value: gp3 }
+          - { key: servicecode, value: AmazonEC2 }
+      price_transform:
+        divide_by: 1024.0
+      pricing_model:
+        type: linear_with_baseline
+        quantity_param: throughput_mibps
+        baseline: 125
+
+- name: ebs/gp2
+  display_name: "General Purpose SSD (gp2)"
+  default_region: us-east-1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.10
+      query:
+        service: AmazonEC2
+        product_family: Storage
+        attributes:
+          - { key: volumeApiName, value: gp2 }
+          - { key: servicecode, value: AmazonEC2 }
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+
+- name: ebs/io2
+  display_name: "Provisioned IOPS SSD (io2)"
+  default_region: us-east-1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.125
+      query:
+        service: AmazonEC2
+        product_family: Storage
+        attributes:
+          - { key: volumeApiName, value: io2 }
+          - { key: servicecode, value: AmazonEC2 }
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+
+    - name: iops
+      is_primary: false
+      unit: IOPS-month
+      default_price: 0.065
+      query:
+        attributes:
+          - { key: group, value: "EBS IOPS" }
+          - { key: volumeApiName, value: io2 }
+          - { key: servicecode, value: AmazonEC2 }
+      pricing_model:
+        type: tiered
+        quantity_param: iops
+        tiers:
+          - limit: 32000
+            default_price: 0.065
+            query_filter:
+              attribute_regex:
+                key: description
+                pattern: ".*tier 1|^((?!tier).)*$"
+          - limit: 64000
+            default_price: 0.0455
+            query_filter:
+              attribute_regex:
+                key: description
+                pattern: "tier 2"
+          - limit: null
+            default_price: 0.03185
+            query_filter:
+              attribute_regex:
+                key: description
+                pattern: "tier 3"
+
+- name: ebs/st1
+  display_name: "Throughput Optimized HDD (st1)"
+  default_region: us-east-1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.045
+      query:
+        service: AmazonEC2
+        product_family: Storage
+        attributes:
+          - { key: volumeApiName, value: st1 }
+          - { key: servicecode, value: AmazonEC2 }
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+
+- name: ebs/sc1
+  display_name: "Cold HDD (sc1)"
+  default_region: us-east-1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.015
+      query:
+        service: AmazonEC2
+        product_family: Storage
+        attributes:
+          - { key: volumeApiName, value: sc1 }
+          - { key: servicecode, value: AmazonEC2 }
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
