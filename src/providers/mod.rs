@@ -44,6 +44,7 @@
 pub mod aws;
 pub mod azure;
 pub mod gcp;
+pub(crate) mod json_utils;
 
 /// Result of a price query, including the source of the price.
 #[derive(Debug, Clone)]

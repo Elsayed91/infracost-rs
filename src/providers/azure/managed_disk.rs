@@ -20,6 +20,24 @@ pub enum ManagedDiskType {
     StandardHdd,
 }
 
+impl ManagedDiskType {
+    /// Parse Azure SKU name to ManagedDiskType.
+    ///
+    /// Handles: "Premium_LRS", "PremiumV2_LRS", "StandardSSD_LRS", "Standard_LRS", "UltraSSD_LRS"
+    pub fn from_sku_name(sku: &str) -> crate::Result<Self> {
+        match sku {
+            "Premium_LRS" | "PremiumV2_LRS" => Ok(Self::PremiumSsd),
+            "StandardSSD_LRS" => Ok(Self::StandardSsd),
+            "Standard_LRS" => Ok(Self::StandardHdd),
+            "UltraSSD_LRS" => Ok(Self::PremiumSsd), // closest match
+            _ => Err(crate::Error::validation(format!(
+                "Unknown Azure SKU: {}",
+                sku
+            ))),
+        }
+    }
+}
+
 impl std::str::FromStr for ManagedDiskType {
     type Err = crate::Error;
 
@@ -149,6 +167,64 @@ impl ManagedDiskSize {
             Self::S30 => "S30",
             Self::S40 => "S40",
             Self::S50 => "S50",
+        }
+    }
+
+    /// Map a disk size in GB to the smallest tier that can accommodate it.
+    ///
+    /// For Premium SSD: maps to P-series (4->P1, 8->P2, ..., 4096->P50)
+    /// For Standard SSD: maps to E-series (4->E1, 8->E2, ..., 4096->E50)
+    /// For Standard HDD: maps to S-series (no S1/S2/S3, starts at 32->S4)
+    pub fn from_size_gb(disk_type: ManagedDiskType, gb: u64) -> crate::Result<Self> {
+        match disk_type {
+            ManagedDiskType::PremiumSsd => match gb {
+                0..=4 => Ok(Self::P1),
+                5..=8 => Ok(Self::P2),
+                9..=16 => Ok(Self::P3),
+                17..=32 => Ok(Self::P4),
+                33..=64 => Ok(Self::P6),
+                65..=128 => Ok(Self::P10),
+                129..=256 => Ok(Self::P15),
+                257..=512 => Ok(Self::P20),
+                513..=1024 => Ok(Self::P30),
+                1025..=2048 => Ok(Self::P40),
+                2049..=4096 => Ok(Self::P50),
+                _ => Err(crate::Error::validation(format!(
+                    "Disk size {} GB exceeds maximum P50 tier (4096 GB)",
+                    gb
+                ))),
+            },
+            ManagedDiskType::StandardSsd => match gb {
+                0..=4 => Ok(Self::E1),
+                5..=8 => Ok(Self::E2),
+                9..=16 => Ok(Self::E3),
+                17..=32 => Ok(Self::E4),
+                33..=64 => Ok(Self::E6),
+                65..=128 => Ok(Self::E10),
+                129..=256 => Ok(Self::E15),
+                257..=512 => Ok(Self::E20),
+                513..=1024 => Ok(Self::E30),
+                1025..=2048 => Ok(Self::E40),
+                2049..=4096 => Ok(Self::E50),
+                _ => Err(crate::Error::validation(format!(
+                    "Disk size {} GB exceeds maximum E50 tier (4096 GB)",
+                    gb
+                ))),
+            },
+            ManagedDiskType::StandardHdd => match gb {
+                0..=32 => Ok(Self::S4),
+                33..=64 => Ok(Self::S6),
+                65..=128 => Ok(Self::S10),
+                129..=256 => Ok(Self::S15),
+                257..=512 => Ok(Self::S20),
+                513..=1024 => Ok(Self::S30),
+                1025..=2048 => Ok(Self::S40),
+                2049..=4096 => Ok(Self::S50),
+                _ => Err(crate::Error::validation(format!(
+                    "Disk size {} GB exceeds maximum S50 tier (4096 GB)",
+                    gb
+                ))),
+            },
         }
     }
 
@@ -327,6 +403,108 @@ mod tests {
         );
         assert_eq!(
             "S50".parse::<ManagedDiskSize>().unwrap(),
+            ManagedDiskSize::S50
+        );
+    }
+
+    #[test]
+    fn test_from_sku_name_premium() {
+        assert_eq!(
+            ManagedDiskType::from_sku_name("Premium_LRS").unwrap(),
+            ManagedDiskType::PremiumSsd
+        );
+        assert_eq!(
+            ManagedDiskType::from_sku_name("PremiumV2_LRS").unwrap(),
+            ManagedDiskType::PremiumSsd
+        );
+    }
+
+    #[test]
+    fn test_from_sku_name_standard_ssd() {
+        assert_eq!(
+            ManagedDiskType::from_sku_name("StandardSSD_LRS").unwrap(),
+            ManagedDiskType::StandardSsd
+        );
+    }
+
+    #[test]
+    fn test_from_sku_name_standard_hdd() {
+        assert_eq!(
+            ManagedDiskType::from_sku_name("Standard_LRS").unwrap(),
+            ManagedDiskType::StandardHdd
+        );
+    }
+
+    #[test]
+    fn test_from_sku_name_ultra() {
+        assert_eq!(
+            ManagedDiskType::from_sku_name("UltraSSD_LRS").unwrap(),
+            ManagedDiskType::PremiumSsd
+        );
+    }
+
+    #[test]
+    fn test_from_sku_name_invalid() {
+        assert!(ManagedDiskType::from_sku_name("Unknown_LRS").is_err());
+    }
+
+    #[test]
+    fn test_from_size_gb_premium_boundaries() {
+        assert_eq!(
+            ManagedDiskSize::from_size_gb(ManagedDiskType::PremiumSsd, 4).unwrap(),
+            ManagedDiskSize::P1
+        );
+        assert_eq!(
+            ManagedDiskSize::from_size_gb(ManagedDiskType::PremiumSsd, 5).unwrap(),
+            ManagedDiskSize::P2
+        );
+        assert_eq!(
+            ManagedDiskSize::from_size_gb(ManagedDiskType::PremiumSsd, 128).unwrap(),
+            ManagedDiskSize::P10
+        );
+        assert_eq!(
+            ManagedDiskSize::from_size_gb(ManagedDiskType::PremiumSsd, 129).unwrap(),
+            ManagedDiskSize::P15
+        );
+        assert_eq!(
+            ManagedDiskSize::from_size_gb(ManagedDiskType::PremiumSsd, 4096).unwrap(),
+            ManagedDiskSize::P50
+        );
+    }
+
+    #[test]
+    fn test_from_size_gb_premium_exceeds_max() {
+        assert!(ManagedDiskSize::from_size_gb(ManagedDiskType::PremiumSsd, 5000).is_err());
+    }
+
+    #[test]
+    fn test_from_size_gb_standard_ssd() {
+        assert_eq!(
+            ManagedDiskSize::from_size_gb(ManagedDiskType::StandardSsd, 4).unwrap(),
+            ManagedDiskSize::E1
+        );
+        assert_eq!(
+            ManagedDiskSize::from_size_gb(ManagedDiskType::StandardSsd, 128).unwrap(),
+            ManagedDiskSize::E10
+        );
+        assert_eq!(
+            ManagedDiskSize::from_size_gb(ManagedDiskType::StandardSsd, 4096).unwrap(),
+            ManagedDiskSize::E50
+        );
+    }
+
+    #[test]
+    fn test_from_size_gb_standard_hdd() {
+        assert_eq!(
+            ManagedDiskSize::from_size_gb(ManagedDiskType::StandardHdd, 32).unwrap(),
+            ManagedDiskSize::S4
+        );
+        assert_eq!(
+            ManagedDiskSize::from_size_gb(ManagedDiskType::StandardHdd, 33).unwrap(),
+            ManagedDiskSize::S6
+        );
+        assert_eq!(
+            ManagedDiskSize::from_size_gb(ManagedDiskType::StandardHdd, 4096).unwrap(),
             ManagedDiskSize::S50
         );
     }

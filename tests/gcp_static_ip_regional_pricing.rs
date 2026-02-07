@@ -24,20 +24,6 @@ fn get_client() -> Result<Client, Box<dyn std::error::Error>> {
     Ok(client)
 }
 
-/// Test regions covering all major geographic areas:
-/// - Americas: us-central1, us-east1, southamerica-east1
-/// - Europe: europe-west1, europe-north1
-/// - Asia-Pacific: asia-southeast1, australia-southeast1
-const TEST_REGIONS: &[&str] = &[
-    "us-central1",          // Americas: Iowa
-    "us-east1",             // Americas: South Carolina
-    "southamerica-east1",   // Americas: São Paulo
-    "europe-west1",         // Europe: Belgium
-    "europe-north1",        // Europe: Finland
-    "asia-southeast1",      // Asia-Pacific: Singapore
-    "australia-southeast1", // Asia-Pacific: Sydney
-];
-
 // ============================================================
 // Per-Region Comparison Tests
 // ============================================================

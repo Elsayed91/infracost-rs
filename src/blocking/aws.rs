@@ -67,6 +67,82 @@ impl BlockingAwsProvider {
         }
     }
 
+    /// Parse an AWS EBS volume JSON (from `aws ec2 describe-volumes`) into a blocking EbsBuilder.
+    pub fn ebs_from_json(self, json: &serde_json::Value) -> crate::Result<BlockingAwsEbsBuilder> {
+        let parsed = crate::providers::aws::from_json::parse_ebs_json(json)?;
+        Ok(BlockingAwsEbsBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            ebs_type: parsed.ebs_type,
+            region: parsed.region,
+            api_key: None,
+            override_default: None,
+            size_gb: parsed.size_gb,
+            iops: parsed.iops,
+            throughput_mibps: parsed.throughput_mibps,
+        })
+    }
+
+    /// Parse an AWS snapshot JSON (from `aws ec2 describe-snapshots`) into a blocking SnapshotBuilder.
+    pub fn snapshot_from_json(
+        self,
+        json: &serde_json::Value,
+    ) -> crate::Result<BlockingAwsSnapshotBuilder> {
+        let parsed = crate::providers::aws::from_json::parse_snapshot_json(json)?;
+        Ok(BlockingAwsSnapshotBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            region: parsed.region,
+            api_key: None,
+            override_default: None,
+            size_gb: parsed.size_gb,
+        })
+    }
+
+    /// Parse an AWS Elastic IP JSON (from `aws ec2 describe-addresses`) into a blocking ElasticIpBuilder.
+    pub fn elastic_ip_from_json(
+        self,
+        json: &serde_json::Value,
+    ) -> crate::Result<BlockingAwsElasticIpBuilder> {
+        let parsed = crate::providers::aws::from_json::parse_elastic_ip_json(json)?;
+        Ok(BlockingAwsElasticIpBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            region: parsed.region,
+            api_key: None,
+            override_default: None,
+        })
+    }
+
+    /// Parse an AWS NAT Gateway JSON (from `aws ec2 describe-nat-gateways`) into a blocking NatGatewayBuilder.
+    pub fn nat_gateway_from_json(
+        self,
+        json: &serde_json::Value,
+    ) -> crate::Result<BlockingAwsNatGatewayBuilder> {
+        let parsed = crate::providers::aws::from_json::parse_nat_gateway_json(json)?;
+        Ok(BlockingAwsNatGatewayBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            region: parsed.region,
+            api_key: None,
+            override_default: None,
+            data_processed_gb: None,
+        })
+    }
+
+    /// Parse an AWS ALB JSON (from `aws elbv2 describe-load-balancers`) into a blocking AlbBuilder.
+    pub fn alb_from_json(self, json: &serde_json::Value) -> crate::Result<BlockingAwsAlbBuilder> {
+        let parsed = crate::providers::aws::from_json::parse_alb_json(json)?;
+        Ok(BlockingAwsAlbBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            region: parsed.region,
+            api_key: None,
+            override_default: None,
+            lcu_hours: None,
+        })
+    }
+
     /// Query AWS EBS Snapshot pricing.
     ///
     /// Default: $0.05/GB-month

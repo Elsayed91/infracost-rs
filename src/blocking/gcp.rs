@@ -69,7 +69,73 @@ impl BlockingGcpProvider {
             override_default: None,
             size_gb: None,
             iops: None,
+            throughput_mb_per_sec: None,
+            regional: false,
         }
+    }
+
+    /// Parse a GCP disk JSON (from `gcloud compute disks describe --format=json`) into a blocking DiskBuilder.
+    pub fn disk_from_json(self, json: &serde_json::Value) -> crate::Result<BlockingGcpDiskBuilder> {
+        let parsed = crate::providers::gcp::from_json::parse_disk_json(json)?;
+        Ok(BlockingGcpDiskBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            disk_type: parsed.disk_type,
+            region: parsed.region,
+            api_key: None,
+            override_default: None,
+            size_gb: parsed.size_gb,
+            iops: parsed.iops,
+            throughput_mb_per_sec: parsed.throughput,
+            regional: parsed.regional,
+        })
+    }
+
+    /// Parse a GCP snapshot JSON (from `gcloud compute snapshots describe --format=json`) into a blocking SnapshotBuilder.
+    pub fn snapshot_from_json(
+        self,
+        json: &serde_json::Value,
+    ) -> crate::Result<BlockingGcpSnapshotBuilder> {
+        let parsed = crate::providers::gcp::from_json::parse_snapshot_json(json)?;
+        Ok(BlockingGcpSnapshotBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            region: parsed.region,
+            api_key: None,
+            override_default: None,
+            size_gb: parsed.size_gb,
+        })
+    }
+
+    /// Parse a GCP static IP JSON (from `gcloud compute addresses describe --format=json`) into a blocking StaticIpBuilder.
+    pub fn static_ip_from_json(
+        self,
+        json: &serde_json::Value,
+    ) -> crate::Result<BlockingGcpStaticIpBuilder> {
+        let parsed = crate::providers::gcp::from_json::parse_static_ip_json(json)?;
+        Ok(BlockingGcpStaticIpBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            region: parsed.region,
+            api_key: None,
+            override_default: None,
+        })
+    }
+
+    /// Parse a GCP NAT gateway JSON into a blocking NatGatewayBuilder.
+    pub fn nat_gateway_from_json(
+        self,
+        json: &serde_json::Value,
+    ) -> crate::Result<BlockingGcpNatGatewayBuilder> {
+        let parsed = crate::providers::gcp::from_json::parse_nat_gateway_json(json)?;
+        Ok(BlockingGcpNatGatewayBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            region: parsed.region,
+            api_key: None,
+            override_default: None,
+            data_processed_gb: None,
+        })
     }
 
     /// Query GCP Snapshot pricing.
@@ -144,6 +210,8 @@ pub struct BlockingGcpDiskBuilder {
     override_default: Option<f64>,
     size_gb: Option<u64>,
     iops: Option<u64>,
+    throughput_mb_per_sec: Option<u64>,
+    regional: bool,
 }
 
 impl BlockingGcpDiskBuilder {
@@ -185,6 +253,18 @@ impl BlockingGcpDiskBuilder {
         self
     }
 
+    /// Set provisioned throughput in MiB/s (for Hyperdisk types).
+    pub fn throughput(mut self, mb_per_sec: u64) -> Self {
+        self.throughput_mb_per_sec = Some(mb_per_sec);
+        self
+    }
+
+    /// Set whether this is a regional disk (replicated across zones, 2x price).
+    pub fn regional(mut self, regional: bool) -> Self {
+        self.regional = regional;
+        self
+    }
+
     /// Fetch the full price result including source information.
     pub fn fetch(self) -> Result<PriceResult> {
         let mut b = self.client.gcp().disk(self.disk_type);
@@ -203,6 +283,12 @@ impl BlockingGcpDiskBuilder {
         if let Some(v) = self.iops {
             b = b.iops(v);
         }
+        if let Some(v) = self.throughput_mb_per_sec {
+            b = b.throughput(v);
+        }
+        if self.regional {
+            b = b.regional(true);
+        }
         self.runtime.block_on(b.fetch())
     }
 
@@ -213,14 +299,8 @@ impl BlockingGcpDiskBuilder {
 
     /// Fetch total monthly cost based on disk specs.
     ///
-    /// Requires `size_gb()` to be set. Optionally set `iops()` for pd-extreme disks.
-    ///
-    /// The calculation:
-    /// - Storage cost = storage_price × size_gb
-    /// - IOPS cost (pd-extreme only) = iops_price × iops
-    /// - Total = storage_cost + iops_cost
-    ///
-    /// For non-extreme disk types, IOPS is ignored as they don't support provisioned IOPS.
+    /// Requires `size_gb()` to be set. Optionally set `iops()` and `throughput()`.
+    /// Regional disks cost 2x.
     pub fn fetch_monthly(self) -> Result<PriceResult> {
         let mut b = self.client.gcp().disk(self.disk_type);
         if let Some(v) = self.region {
@@ -237,6 +317,12 @@ impl BlockingGcpDiskBuilder {
         }
         if let Some(v) = self.iops {
             b = b.iops(v);
+        }
+        if let Some(v) = self.throughput_mb_per_sec {
+            b = b.throughput(v);
+        }
+        if self.regional {
+            b = b.regional(true);
         }
         self.runtime.block_on(b.fetch_monthly())
     }

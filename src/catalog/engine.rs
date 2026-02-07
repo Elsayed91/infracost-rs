@@ -115,13 +115,13 @@ impl PricingEngine {
                 let mut price = selected
                     .map(|p| {
                         // Apply price-level filter if defined (e.g., Consumption for Azure)
-                        if let Some(ref price_filter) = component.price_filter {
-                            if let Some(ref po) = price_filter.purchase_option {
-                                return p
-                                    .prices()
-                                    .purchase_option(po)
-                                    .first_nonzero_f64_or(default_price);
-                            }
+                        if let Some(ref price_filter) = component.price_filter
+                            && let Some(ref po) = price_filter.purchase_option
+                        {
+                            return p
+                                .prices()
+                                .purchase_option(po)
+                                .first_nonzero_f64_or(default_price);
                         }
                         p.first_nonzero_price_or(default_price)
                     })
@@ -180,13 +180,13 @@ impl PricingEngine {
             if pf.description_starts_with.is_some() || !pf.description_excludes.is_empty() {
                 let desc = product.attribute("description").unwrap_or("");
 
-                if let Some(ref prefix) = pf.description_starts_with {
-                    if !desc.starts_with(prefix.as_str()) {
-                        return false;
-                    }
+                if let Some(ref prefix) = pf.description_starts_with
+                    && !desc.starts_with(prefix.as_str())
+                {
+                    return false;
                 }
 
-                for ref substr in &pf.description_contains {
+                for substr in &pf.description_contains {
                     if !desc.contains(substr.as_str()) {
                         return false;
                     }
@@ -203,10 +203,10 @@ impl PricingEngine {
             if pf.usagetype_ends_with.is_some() || !pf.usagetype_excludes.is_empty() {
                 let usage = product.attribute("usagetype").unwrap_or("");
 
-                if let Some(ref suffix) = pf.usagetype_ends_with {
-                    if !usage.ends_with(suffix.as_str()) {
-                        return false;
-                    }
+                if let Some(ref suffix) = pf.usagetype_ends_with
+                    && !usage.ends_with(suffix.as_str())
+                {
+                    return false;
                 }
 
                 for exclude in &pf.usagetype_excludes {

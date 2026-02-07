@@ -171,7 +171,13 @@ impl DiskType {
 
 impl From<&str> for DiskType {
     fn from(s: &str) -> Self {
-        match s.to_lowercase().replace(['-', '_'], "").as_str() {
+        // Handle full GCP URLs like "projects/xxx/zones/us-central1-a/diskTypes/pd-ssd"
+        let name = if s.contains('/') {
+            s.rsplit('/').next().unwrap_or(s)
+        } else {
+            s
+        };
+        match name.to_lowercase().replace(['-', '_'], "").as_str() {
             "pdssd" | "ssd" => Self::PdSsd,
             "pdbalanced" | "balanced" => Self::PdBalanced,
             "pdextreme" | "extreme" => Self::PdExtreme,
@@ -205,6 +211,8 @@ pub struct DiskBuilder<'a> {
     size_gb: Option<u64>,
     iops: Option<u64>,
     throughput_mb_per_sec: Option<u64>,
+    // Regional disk (replicated across zones) = 2x price
+    regional: bool,
 }
 
 impl<'a> DiskBuilder<'a> {
@@ -219,6 +227,7 @@ impl<'a> DiskBuilder<'a> {
             size_gb: None,
             iops: None,
             throughput_mb_per_sec: None,
+            regional: false,
         }
     }
 
@@ -260,12 +269,21 @@ impl<'a> DiskBuilder<'a> {
         self
     }
 
+    /// Set whether this is a regional disk (replicated across zones).
+    ///
+    /// Regional disks cost 2x the price of zonal disks.
+    pub fn regional(mut self, regional: bool) -> Self {
+        self.regional = regional;
+        self
+    }
+
     /// Set provisioned throughput in MiB/s (for Hyperdisk types).
     ///
     /// Supported disk types and their throughput pricing:
     /// - Hyperdisk Balanced: $0.04/MiB/s-month
     /// - Hyperdisk Throughput: $0.25/MiB/s-month
     /// - Hyperdisk ML: $0.12/MiB/s-month
+    ///
     /// For other disk types: throughput is ignored (not supported).
     pub fn throughput(mut self, mb_per_sec: u64) -> Self {
         self.throughput_mb_per_sec = Some(mb_per_sec);
@@ -279,9 +297,10 @@ impl<'a> DiskBuilder<'a> {
 
     /// Fetch the full price result including source information.
     pub async fn fetch(self) -> Result<PriceResult> {
+        let regional = self.regional;
         let resource = gcp_catalog().find(self.disk_type.resource_name())?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
-        PricingEngine::fetch(
+        let mut result = PricingEngine::fetch(
             self.client,
             resource,
             "gcp",
@@ -289,7 +308,11 @@ impl<'a> DiskBuilder<'a> {
             self.api_key.as_deref(),
             self.override_default,
         )
-        .await
+        .await?;
+        if regional {
+            result.price *= 2.0;
+        }
+        Ok(result)
     }
 
     /// Fetch total monthly cost based on disk specs.
@@ -339,6 +362,7 @@ impl<'a> DiskBuilder<'a> {
         let size_gb = self
             .size_gb
             .ok_or_else(|| crate::Error::validation("size_gb is required for fetch_monthly"))?;
+        let regional = self.regional;
 
         let resource = gcp_catalog().find(self.disk_type.resource_name())?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
@@ -352,7 +376,7 @@ impl<'a> DiskBuilder<'a> {
             params.insert("throughput_mibps".to_string(), throughput);
         }
 
-        PricingEngine::fetch_monthly(
+        let mut result = PricingEngine::fetch_monthly(
             self.client,
             resource,
             "gcp",
@@ -360,7 +384,11 @@ impl<'a> DiskBuilder<'a> {
             self.api_key.as_deref(),
             &params,
         )
-        .await
+        .await?;
+        if regional {
+            result.price *= 2.0;
+        }
+        Ok(result)
     }
 }
 
@@ -632,5 +660,76 @@ mod tests {
         assert_eq!(DiskType::PdSsd.default_iops_price(), None);
         assert_eq!(DiskType::PdBalanced.default_iops_price(), None);
         assert_eq!(DiskType::PdStandard.default_iops_price(), None);
+    }
+
+    #[test]
+    fn test_disk_type_from_url() {
+        assert_eq!(
+            DiskType::from("projects/my-project/zones/us-central1-a/diskTypes/pd-ssd"),
+            DiskType::PdSsd
+        );
+        assert_eq!(
+            DiskType::from("projects/my-project/zones/us-central1-a/diskTypes/pd-balanced"),
+            DiskType::PdBalanced
+        );
+        assert_eq!(
+            DiskType::from("projects/my-project/zones/us-central1-a/diskTypes/pd-extreme"),
+            DiskType::PdExtreme
+        );
+        assert_eq!(
+            DiskType::from("projects/my-project/zones/us-central1-a/diskTypes/pd-standard"),
+            DiskType::PdStandard
+        );
+        assert_eq!(
+            DiskType::from("projects/my-project/zones/us-central1-a/diskTypes/hyperdisk-balanced"),
+            DiskType::HyperdiskBalanced
+        );
+    }
+
+    #[tokio::test]
+    async fn test_regional_disk_doubles_price() {
+        let client = Client::anonymous();
+        let zonal = client
+            .gcp()
+            .disk(DiskType::PdSsd)
+            .region("us-central1")
+            .fetch()
+            .await
+            .unwrap();
+
+        let regional = client
+            .gcp()
+            .disk(DiskType::PdSsd)
+            .region("us-central1")
+            .regional(true)
+            .fetch()
+            .await
+            .unwrap();
+
+        assert_eq!(regional.price, zonal.price * 2.0);
+    }
+
+    #[tokio::test]
+    async fn test_regional_disk_monthly_doubles_price() {
+        let client = Client::anonymous();
+        let zonal = client
+            .gcp()
+            .disk(DiskType::PdSsd)
+            .size_gb(500)
+            .fetch_monthly()
+            .await
+            .unwrap();
+
+        let regional = client
+            .gcp()
+            .disk(DiskType::PdSsd)
+            .size_gb(500)
+            .regional(true)
+            .fetch_monthly()
+            .await
+            .unwrap();
+
+        assert_eq!(regional.price, zonal.price * 2.0);
+        assert_eq!(regional.price, 170.0); // 500 * 0.17 * 2
     }
 }

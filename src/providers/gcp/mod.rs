@@ -21,6 +21,7 @@
 
 mod disk;
 mod forwarding_rule;
+pub(crate) mod from_json;
 mod nat_gateway;
 mod snapshot;
 mod static_ip;
@@ -31,7 +32,7 @@ pub use nat_gateway::NatGatewayBuilder;
 pub use snapshot::SnapshotBuilder;
 pub use static_ip::StaticIpBuilder;
 
-use crate::Client;
+use crate::{Client, Result};
 
 /// GCP provider for querying GCP resource prices.
 pub struct GcpProvider<'a> {
@@ -95,5 +96,60 @@ impl<'a> GcpProvider<'a> {
     /// Note: Additional data processing charges apply
     pub fn forwarding_rule(self) -> ForwardingRuleBuilder<'a> {
         ForwardingRuleBuilder::new(self.client)
+    }
+
+    /// Parse a GCP disk JSON (from `gcloud compute disks describe --format=json`) into a DiskBuilder.
+    pub fn disk_from_json(self, json: &serde_json::Value) -> Result<DiskBuilder<'a>> {
+        let parsed = from_json::parse_disk_json(json)?;
+        let mut builder = DiskBuilder::new(self.client, parsed.disk_type);
+        if let Some(r) = parsed.region {
+            builder = builder.region(r);
+        }
+        if let Some(s) = parsed.size_gb {
+            builder = builder.size_gb(s);
+        }
+        if let Some(i) = parsed.iops {
+            builder = builder.iops(i);
+        }
+        if let Some(t) = parsed.throughput {
+            builder = builder.throughput(t);
+        }
+        if parsed.regional {
+            builder = builder.regional(true);
+        }
+        Ok(builder)
+    }
+
+    /// Parse a GCP snapshot JSON (from `gcloud compute snapshots describe --format=json`) into a SnapshotBuilder.
+    pub fn snapshot_from_json(self, json: &serde_json::Value) -> Result<SnapshotBuilder<'a>> {
+        let parsed = from_json::parse_snapshot_json(json)?;
+        let mut builder = SnapshotBuilder::new(self.client);
+        if let Some(r) = parsed.region {
+            builder = builder.region(r);
+        }
+        if let Some(s) = parsed.size_gb {
+            builder = builder.size_gb(s);
+        }
+        Ok(builder)
+    }
+
+    /// Parse a GCP static IP JSON (from `gcloud compute addresses describe --format=json`) into a StaticIpBuilder.
+    pub fn static_ip_from_json(self, json: &serde_json::Value) -> Result<StaticIpBuilder<'a>> {
+        let parsed = from_json::parse_static_ip_json(json)?;
+        let mut builder = StaticIpBuilder::new(self.client);
+        if let Some(r) = parsed.region {
+            builder = builder.region(r);
+        }
+        Ok(builder)
+    }
+
+    /// Parse a GCP NAT gateway JSON (from `gcloud compute routers nats describe --format=json`) into a NatGatewayBuilder.
+    pub fn nat_gateway_from_json(self, json: &serde_json::Value) -> Result<NatGatewayBuilder<'a>> {
+        let parsed = from_json::parse_nat_gateway_json(json)?;
+        let mut builder = NatGatewayBuilder::new(self.client);
+        if let Some(r) = parsed.region {
+            builder = builder.region(r);
+        }
+        Ok(builder)
     }
 }

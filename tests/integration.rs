@@ -218,7 +218,7 @@ async fn test_gcp_disk_provider() {
             "Price should be positive for {:?}",
             disk_type
         );
-        assert_eq!(result.unit, "GB-month");
+        assert_eq!(result.unit, "GiB-month");
     }
 }
 

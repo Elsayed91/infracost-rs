@@ -141,6 +141,69 @@ impl BlockingAzureProvider {
             override_default: None,
         }
     }
+
+    /// Create a managed disk builder from Azure CLI JSON output (`az disk show --output json`).
+    pub fn managed_disk_from_json(
+        self,
+        json: &serde_json::Value,
+    ) -> Result<BlockingAzureManagedDiskBuilder> {
+        let parsed = crate::providers::azure::from_json::parse_managed_disk_json(json)?;
+        let mut builder = BlockingAzureManagedDiskBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            disk_type: parsed.disk_type,
+            size: parsed.size,
+            region: None,
+            api_key: None,
+            override_default: None,
+        };
+        if let Some(r) = parsed.region {
+            builder.region = Some(r);
+        }
+        Ok(builder)
+    }
+
+    /// Create a snapshot builder from Azure CLI JSON output (`az snapshot show --output json`).
+    pub fn snapshot_from_json(
+        self,
+        json: &serde_json::Value,
+    ) -> Result<BlockingAzureSnapshotBuilder> {
+        let parsed = crate::providers::azure::from_json::parse_snapshot_json(json)?;
+        let mut builder = BlockingAzureSnapshotBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            region: None,
+            api_key: None,
+            override_default: None,
+            size_gb: None,
+        };
+        if let Some(r) = parsed.region {
+            builder.region = Some(r);
+        }
+        if let Some(s) = parsed.size_gb {
+            builder.size_gb = Some(s);
+        }
+        Ok(builder)
+    }
+
+    /// Create a public IP builder from Azure CLI JSON output (`az network public-ip show --output json`).
+    pub fn public_ip_from_json(
+        self,
+        json: &serde_json::Value,
+    ) -> Result<BlockingAzurePublicIpBuilder> {
+        let parsed = crate::providers::azure::from_json::parse_public_ip_json(json)?;
+        let mut builder = BlockingAzurePublicIpBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            region: None,
+            api_key: None,
+            override_default: None,
+        };
+        if let Some(r) = parsed.region {
+            builder.region = Some(r);
+        }
+        Ok(builder)
+    }
 }
 
 // ============================================================

@@ -92,7 +92,6 @@ async fn test_snapshot_convenience_vs_raw() -> Result<(), Box<dyn std::error::Er
         .region(region)
         .product_family("Storage")
         .attribute("resourceGroup", "PDSnapshot")
-        .attribute_regex("description", "^Storage PD Snapshot")
         .build();
 
     let products = client.query_products(filter).await?;
@@ -103,7 +102,18 @@ async fn test_snapshot_convenience_vs_raw() -> Result<(), Box<dyn std::error::Er
         region
     );
 
-    let raw_price = products[0].first_nonzero_price_or(0.05);
+    // Apply the same post-filter the convenience function uses:
+    // find the product whose description starts with "Storage PD Snapshot"
+    let selected = products
+        .iter()
+        .find(|p| {
+            p.attribute("description")
+                .unwrap_or("")
+                .starts_with("Storage PD Snapshot")
+        })
+        .unwrap_or(&products[0]);
+
+    let raw_price = selected.first_nonzero_price_or(0.05);
 
     // Both should return API pricing
     assert_eq!(convenience_result.source, PriceSource::Api);
