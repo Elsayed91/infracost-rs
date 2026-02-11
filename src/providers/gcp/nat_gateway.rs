@@ -38,8 +38,8 @@ use super::super::PriceResult;
 // ============================================================
 
 /// Builder for querying GCP NAT Gateway prices.
-pub struct NatGatewayBuilder<'a> {
-    client: &'a Client,
+pub struct NatGatewayBuilder {
+    client: Client,
     region: Option<String>,
     api_key: Option<String>,
     override_default: Option<f64>,
@@ -47,9 +47,9 @@ pub struct NatGatewayBuilder<'a> {
     data_processed_gb: Option<u64>,
 }
 
-impl<'a> NatGatewayBuilder<'a> {
+impl NatGatewayBuilder {
     /// Create a new NAT Gateway builder
-    pub(crate) fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: Client) -> Self {
         Self {
             client,
             region: None,
@@ -94,7 +94,7 @@ impl<'a> NatGatewayBuilder<'a> {
         let resource = gcp_catalog().find("nat-gateway")?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         PricingEngine::fetch(
-            self.client,
+            &self.client,
             resource,
             "gcp",
             region,
@@ -128,7 +128,7 @@ impl<'a> NatGatewayBuilder<'a> {
         let mut params = HashMap::new();
         params.insert("data_processed_gb".to_string(), data_gb);
         PricingEngine::fetch_monthly(
-            self.client,
+            &self.client,
             resource,
             "gcp",
             region,

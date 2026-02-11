@@ -90,8 +90,8 @@ impl From<&str> for BackendServiceTier {
 // ============================================================
 
 /// Builder for querying GCP Backend Service prices.
-pub struct BackendServiceBuilder<'a> {
-    client: &'a Client,
+pub struct BackendServiceBuilder {
+    client: Client,
     tier: BackendServiceTier,
     region: Option<String>,
     api_key: Option<String>,
@@ -100,9 +100,9 @@ pub struct BackendServiceBuilder<'a> {
     forwarding_rules: Option<u64>,
 }
 
-impl<'a> BackendServiceBuilder<'a> {
+impl BackendServiceBuilder {
     /// Create a new Backend Service builder.
-    pub(crate) fn new(client: &'a Client, tier: BackendServiceTier) -> Self {
+    pub(crate) fn new(client: Client, tier: BackendServiceTier) -> Self {
         Self {
             client,
             tier,
@@ -173,7 +173,7 @@ impl<'a> BackendServiceBuilder<'a> {
         let resource = gcp_catalog().find(self.tier.catalog_name())?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         PricingEngine::fetch(
-            self.client,
+            &self.client,
             resource,
             "gcp",
             region,
@@ -210,7 +210,7 @@ impl<'a> BackendServiceBuilder<'a> {
         params.insert("data_processed_gb".to_string(), data_gb);
 
         let mut result = PricingEngine::fetch_monthly(
-            self.client,
+            &self.client,
             resource,
             "gcp",
             region,
@@ -225,7 +225,7 @@ impl<'a> BackendServiceBuilder<'a> {
         {
             let fr_resource = gcp_catalog().find("forwarding-rule")?;
             let fr_result = PricingEngine::fetch(
-                self.client,
+                &self.client,
                 fr_resource,
                 "gcp",
                 region,

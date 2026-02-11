@@ -297,8 +297,8 @@ impl From<&str> for ManagedDiskSize {
 // ============================================================
 
 /// Builder for querying Azure Managed Disk prices.
-pub struct ManagedDiskBuilder<'a> {
-    client: &'a Client,
+pub struct ManagedDiskBuilder {
+    client: Client,
     disk_type: ManagedDiskType,
     size: ManagedDiskSize,
     region: Option<String>,
@@ -306,13 +306,9 @@ pub struct ManagedDiskBuilder<'a> {
     override_default: Option<f64>,
 }
 
-impl<'a> ManagedDiskBuilder<'a> {
+impl ManagedDiskBuilder {
     /// Create a new managed disk builder
-    pub(crate) fn new(
-        client: &'a Client,
-        disk_type: ManagedDiskType,
-        size: ManagedDiskSize,
-    ) -> Self {
+    pub(crate) fn new(client: Client, disk_type: ManagedDiskType, size: ManagedDiskSize) -> Self {
         Self {
             client,
             disk_type,
@@ -360,7 +356,7 @@ impl<'a> ManagedDiskBuilder<'a> {
         let resource = azure_catalog().find(&resource_name)?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         PricingEngine::fetch(
-            self.client,
+            &self.client,
             resource,
             "azure",
             region,

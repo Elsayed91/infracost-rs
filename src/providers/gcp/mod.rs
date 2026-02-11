@@ -37,13 +37,13 @@ pub use static_ip::StaticIpBuilder;
 use crate::{Client, Result};
 
 /// GCP provider for querying GCP resource prices.
-pub struct GcpProvider<'a> {
-    pub(crate) client: &'a Client,
+pub struct GcpProvider {
+    pub(crate) client: Client,
 }
 
-impl<'a> GcpProvider<'a> {
+impl GcpProvider {
     /// Create a new GCP provider
-    pub(crate) fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: Client) -> Self {
         Self { client }
     }
 
@@ -66,21 +66,21 @@ impl<'a> GcpProvider<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn disk(self, disk_type: impl Into<DiskType>) -> DiskBuilder<'a> {
+    pub fn disk(self, disk_type: impl Into<DiskType>) -> DiskBuilder {
         DiskBuilder::new(self.client, disk_type.into())
     }
 
     /// Query GCP Snapshot pricing.
     ///
     /// Default: $0.05/GB-month
-    pub fn snapshot(self) -> SnapshotBuilder<'a> {
+    pub fn snapshot(self) -> SnapshotBuilder {
         SnapshotBuilder::new(self.client)
     }
 
     /// Query GCP Static IP pricing.
     ///
     /// Default: $0.01/hour (~$7.30/month)
-    pub fn static_ip(self) -> StaticIpBuilder<'a> {
+    pub fn static_ip(self) -> StaticIpBuilder {
         StaticIpBuilder::new(self.client)
     }
 
@@ -88,7 +88,7 @@ impl<'a> GcpProvider<'a> {
     ///
     /// Default: $0.0014/hour (~$1.02/month)
     /// Note: Additional data processing charges apply ($0.045/GB)
-    pub fn nat_gateway(self) -> NatGatewayBuilder<'a> {
+    pub fn nat_gateway(self) -> NatGatewayBuilder {
         NatGatewayBuilder::new(self.client)
     }
 
@@ -96,7 +96,7 @@ impl<'a> GcpProvider<'a> {
     ///
     /// Default: $0.025/hour (~$18.25/month)
     /// Note: Additional data processing charges apply
-    pub fn forwarding_rule(self) -> ForwardingRuleBuilder<'a> {
+    pub fn forwarding_rule(self) -> ForwardingRuleBuilder {
         ForwardingRuleBuilder::new(self.client)
     }
 
@@ -123,12 +123,12 @@ impl<'a> GcpProvider<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn backend_service(self, tier: impl Into<BackendServiceTier>) -> BackendServiceBuilder<'a> {
+    pub fn backend_service(self, tier: impl Into<BackendServiceTier>) -> BackendServiceBuilder {
         BackendServiceBuilder::new(self.client, tier.into())
     }
 
     /// Parse a GCP disk JSON (from `gcloud compute disks describe --format=json`) into a DiskBuilder.
-    pub fn disk_from_json(self, json: &serde_json::Value) -> Result<DiskBuilder<'a>> {
+    pub fn disk_from_json(self, json: &serde_json::Value) -> Result<DiskBuilder> {
         let parsed = from_json::parse_disk_json(json)?;
         let mut builder = DiskBuilder::new(self.client, parsed.disk_type);
         if let Some(r) = parsed.region {
@@ -150,7 +150,7 @@ impl<'a> GcpProvider<'a> {
     }
 
     /// Parse a GCP snapshot JSON (from `gcloud compute snapshots describe --format=json`) into a SnapshotBuilder.
-    pub fn snapshot_from_json(self, json: &serde_json::Value) -> Result<SnapshotBuilder<'a>> {
+    pub fn snapshot_from_json(self, json: &serde_json::Value) -> Result<SnapshotBuilder> {
         let parsed = from_json::parse_snapshot_json(json)?;
         let mut builder = SnapshotBuilder::new(self.client);
         if let Some(r) = parsed.region {
@@ -163,7 +163,7 @@ impl<'a> GcpProvider<'a> {
     }
 
     /// Parse a GCP static IP JSON (from `gcloud compute addresses describe --format=json`) into a StaticIpBuilder.
-    pub fn static_ip_from_json(self, json: &serde_json::Value) -> Result<StaticIpBuilder<'a>> {
+    pub fn static_ip_from_json(self, json: &serde_json::Value) -> Result<StaticIpBuilder> {
         let parsed = from_json::parse_static_ip_json(json)?;
         let mut builder = StaticIpBuilder::new(self.client);
         if let Some(r) = parsed.region {
@@ -173,7 +173,7 @@ impl<'a> GcpProvider<'a> {
     }
 
     /// Parse a GCP NAT gateway JSON (from `gcloud compute routers nats describe --format=json`) into a NatGatewayBuilder.
-    pub fn nat_gateway_from_json(self, json: &serde_json::Value) -> Result<NatGatewayBuilder<'a>> {
+    pub fn nat_gateway_from_json(self, json: &serde_json::Value) -> Result<NatGatewayBuilder> {
         let parsed = from_json::parse_nat_gateway_json(json)?;
         let mut builder = NatGatewayBuilder::new(self.client);
         if let Some(r) = parsed.region {
@@ -186,7 +186,7 @@ impl<'a> GcpProvider<'a> {
     pub fn backend_service_from_json(
         self,
         json: &serde_json::Value,
-    ) -> Result<BackendServiceBuilder<'a>> {
+    ) -> Result<BackendServiceBuilder> {
         let parsed = from_json::parse_backend_service_json(json)?;
         let mut builder = BackendServiceBuilder::new(self.client, parsed.tier);
         if let Some(r) = parsed.region {

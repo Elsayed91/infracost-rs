@@ -1,7 +1,6 @@
 //! Blocking AWS provider for querying AWS resource prices.
 //!
 //! This module provides synchronous wrappers around the async AWS provider builders.
-//! Each builder stores parameters and uses `runtime.block_on()` to execute async operations.
 //!
 //! # Example
 //!
@@ -23,8 +22,6 @@
 //! # }
 //! ```
 
-use crate::error::Result;
-use crate::providers::PriceResult;
 use crate::providers::aws::EbsType;
 use std::sync::Arc;
 
@@ -36,51 +33,41 @@ pub struct BlockingAwsProvider {
 
 impl BlockingAwsProvider {
     /// Query AWS EBS volume pricing.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use infracost_rs::blocking::Client;
-    /// use infracost_rs::providers::aws::EbsType;
-    ///
-    /// # fn main() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
-    /// let price = client
-    ///     .aws()
-    ///     .ebs(EbsType::Gp3)
-    ///     .region("us-east-1")
-    ///     .fetch_price()?;
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn ebs(self, ebs_type: impl Into<EbsType>) -> BlockingAwsEbsBuilder {
         BlockingAwsEbsBuilder {
-            client: self.client,
+            inner: self.client.aws().ebs(ebs_type),
             runtime: self.runtime,
-            ebs_type: ebs_type.into(),
-            region: None,
-            api_key: None,
-            override_default: None,
-            size_gb: None,
-            iops: None,
-            throughput_mibps: None,
         }
     }
 
     /// Parse an AWS EBS volume JSON (from `aws ec2 describe-volumes`) into a blocking EbsBuilder.
     pub fn ebs_from_json(self, json: &serde_json::Value) -> crate::Result<BlockingAwsEbsBuilder> {
         let parsed = crate::providers::aws::from_json::parse_ebs_json(json)?;
+        let mut b = self.client.aws().ebs(parsed.ebs_type);
+        if let Some(r) = parsed.region {
+            b = b.region(r);
+        }
+        if let Some(s) = parsed.size_gb {
+            b = b.size_gb(s);
+        }
+        if let Some(i) = parsed.iops {
+            b = b.iops(i);
+        }
+        if let Some(t) = parsed.throughput_mibps {
+            b = b.throughput_mibps(t);
+        }
         Ok(BlockingAwsEbsBuilder {
-            client: self.client,
+            inner: b,
             runtime: self.runtime,
-            ebs_type: parsed.ebs_type,
-            region: parsed.region,
-            api_key: None,
-            override_default: None,
-            size_gb: parsed.size_gb,
-            iops: parsed.iops,
-            throughput_mibps: parsed.throughput_mibps,
         })
+    }
+
+    /// Query AWS EBS Snapshot pricing.
+    pub fn snapshot(self) -> BlockingAwsSnapshotBuilder {
+        BlockingAwsSnapshotBuilder {
+            inner: self.client.aws().snapshot(),
+            runtime: self.runtime,
+        }
     }
 
     /// Parse an AWS snapshot JSON (from `aws ec2 describe-snapshots`) into a blocking SnapshotBuilder.
@@ -89,14 +76,25 @@ impl BlockingAwsProvider {
         json: &serde_json::Value,
     ) -> crate::Result<BlockingAwsSnapshotBuilder> {
         let parsed = crate::providers::aws::from_json::parse_snapshot_json(json)?;
+        let mut b = self.client.aws().snapshot();
+        if let Some(r) = parsed.region {
+            b = b.region(r);
+        }
+        if let Some(s) = parsed.size_gb {
+            b = b.size_gb(s);
+        }
         Ok(BlockingAwsSnapshotBuilder {
-            client: self.client,
+            inner: b,
             runtime: self.runtime,
-            region: parsed.region,
-            api_key: None,
-            override_default: None,
-            size_gb: parsed.size_gb,
         })
+    }
+
+    /// Query AWS Elastic IP pricing (idle/unused).
+    pub fn elastic_ip(self) -> BlockingAwsElasticIpBuilder {
+        BlockingAwsElasticIpBuilder {
+            inner: self.client.aws().elastic_ip(),
+            runtime: self.runtime,
+        }
     }
 
     /// Parse an AWS Elastic IP JSON (from `aws ec2 describe-addresses`) into a blocking ElasticIpBuilder.
@@ -105,13 +103,22 @@ impl BlockingAwsProvider {
         json: &serde_json::Value,
     ) -> crate::Result<BlockingAwsElasticIpBuilder> {
         let parsed = crate::providers::aws::from_json::parse_elastic_ip_json(json)?;
+        let mut b = self.client.aws().elastic_ip();
+        if let Some(r) = parsed.region {
+            b = b.region(r);
+        }
         Ok(BlockingAwsElasticIpBuilder {
-            client: self.client,
+            inner: b,
             runtime: self.runtime,
-            region: parsed.region,
-            api_key: None,
-            override_default: None,
         })
+    }
+
+    /// Query AWS NAT Gateway pricing (hourly).
+    pub fn nat_gateway(self) -> BlockingAwsNatGatewayBuilder {
+        BlockingAwsNatGatewayBuilder {
+            inner: self.client.aws().nat_gateway(),
+            runtime: self.runtime,
+        }
     }
 
     /// Parse an AWS NAT Gateway JSON (from `aws ec2 describe-nat-gateways`) into a blocking NatGatewayBuilder.
@@ -120,594 +127,75 @@ impl BlockingAwsProvider {
         json: &serde_json::Value,
     ) -> crate::Result<BlockingAwsNatGatewayBuilder> {
         let parsed = crate::providers::aws::from_json::parse_nat_gateway_json(json)?;
+        let mut b = self.client.aws().nat_gateway();
+        if let Some(r) = parsed.region {
+            b = b.region(r);
+        }
         Ok(BlockingAwsNatGatewayBuilder {
-            client: self.client,
+            inner: b,
             runtime: self.runtime,
-            region: parsed.region,
-            api_key: None,
-            override_default: None,
-            data_processed_gb: None,
         })
+    }
+
+    /// Query AWS Application Load Balancer pricing.
+    pub fn alb(self) -> BlockingAwsAlbBuilder {
+        BlockingAwsAlbBuilder {
+            inner: self.client.aws().alb(),
+            runtime: self.runtime,
+        }
     }
 
     /// Parse an AWS ALB JSON (from `aws elbv2 describe-load-balancers`) into a blocking AlbBuilder.
     pub fn alb_from_json(self, json: &serde_json::Value) -> crate::Result<BlockingAwsAlbBuilder> {
         let parsed = crate::providers::aws::from_json::parse_alb_json(json)?;
+        let mut b = self.client.aws().alb();
+        if let Some(r) = parsed.region {
+            b = b.region(r);
+        }
         Ok(BlockingAwsAlbBuilder {
-            client: self.client,
+            inner: b,
             runtime: self.runtime,
-            region: parsed.region,
-            api_key: None,
-            override_default: None,
-            lcu_hours: None,
         })
     }
-
-    /// Query AWS EBS Snapshot pricing.
-    ///
-    /// Default: $0.05/GB-month
-    pub fn snapshot(self) -> BlockingAwsSnapshotBuilder {
-        BlockingAwsSnapshotBuilder {
-            client: self.client,
-            runtime: self.runtime,
-            region: None,
-            api_key: None,
-            override_default: None,
-            size_gb: None,
-        }
-    }
-
-    /// Query AWS Elastic IP pricing (idle/unused).
-    ///
-    /// Default: $0.005/hour (~$3.65/month)
-    pub fn elastic_ip(self) -> BlockingAwsElasticIpBuilder {
-        BlockingAwsElasticIpBuilder {
-            client: self.client,
-            runtime: self.runtime,
-            region: None,
-            api_key: None,
-            override_default: None,
-        }
-    }
-
-    /// Query AWS NAT Gateway pricing (hourly).
-    ///
-    /// Default: $0.045/hour (~$32.85/month)
-    /// Note: Additional data processing charges apply ($0.045/GB)
-    pub fn nat_gateway(self) -> BlockingAwsNatGatewayBuilder {
-        BlockingAwsNatGatewayBuilder {
-            client: self.client,
-            runtime: self.runtime,
-            region: None,
-            api_key: None,
-            override_default: None,
-            data_processed_gb: None,
-        }
-    }
-
-    /// Query AWS Application Load Balancer pricing.
-    ///
-    /// Default: $0.0225/hour (~$16.43/month)
-    /// Note: Additional LCU charges apply
-    pub fn alb(self) -> BlockingAwsAlbBuilder {
-        BlockingAwsAlbBuilder {
-            client: self.client,
-            runtime: self.runtime,
-            region: None,
-            api_key: None,
-            override_default: None,
-            lcu_hours: None,
-        }
-    }
 }
 
 // ============================================================
-// BlockingAwsEbsBuilder
+// Blocking Builders (generated via macro)
 // ============================================================
 
-/// Blocking builder for querying AWS EBS prices.
-pub struct BlockingAwsEbsBuilder {
-    client: crate::Client,
-    runtime: Arc<tokio::runtime::Runtime>,
-    ebs_type: EbsType,
-    region: Option<String>,
-    api_key: Option<String>,
-    override_default: Option<f64>,
-    size_gb: Option<u64>,
-    iops: Option<u64>,
-    throughput_mibps: Option<u64>,
-}
-
-impl BlockingAwsEbsBuilder {
-    /// Set the AWS region (e.g., "us-east-1")
-    pub fn region(mut self, region: impl Into<String>) -> Self {
-        self.region = Some(region.into());
-        self
-    }
-
-    /// Set the API key for this request.
-    pub fn api_key(mut self, key: impl Into<String>) -> Self {
-        self.api_key = Some(key.into());
-        self
-    }
-
-    /// Override the default fallback price.
-    pub fn override_default(mut self, price: f64) -> Self {
-        self.override_default = Some(price);
-        self
-    }
-
-    /// Set the volume size in GB (required for `fetch_monthly`).
-    pub fn size_gb(mut self, size: u64) -> Self {
-        self.size_gb = Some(size);
-        self
-    }
-
-    /// Set provisioned IOPS (for gp3/io2 volumes).
-    ///
-    /// For gp3: baseline 3000 IOPS is included; you only pay for IOPS above that.
-    /// For io2: all provisioned IOPS are billed.
-    pub fn iops(mut self, iops: u64) -> Self {
-        self.iops = Some(iops);
-        self
-    }
-
-    /// Set provisioned throughput in MiBps (for gp3 volumes).
-    ///
-    /// Baseline 125 MiBps is included; you only pay for throughput above that.
-    pub fn throughput_mibps(mut self, throughput: u64) -> Self {
-        self.throughput_mibps = Some(throughput);
-        self
-    }
-
-    /// Fetch the full price result including source information.
-    pub fn fetch(self) -> Result<PriceResult> {
-        let mut b = self.client.aws().ebs(self.ebs_type);
-        if let Some(v) = self.region {
-            b = b.region(v);
-        }
-        if let Some(v) = self.api_key {
-            b = b.api_key(v);
-        }
-        if let Some(v) = self.override_default {
-            b = b.override_default(v);
-        }
-        if let Some(v) = self.size_gb {
-            b = b.size_gb(v);
-        }
-        if let Some(v) = self.iops {
-            b = b.iops(v);
-        }
-        if let Some(v) = self.throughput_mibps {
-            b = b.throughput_mibps(v);
-        }
-        self.runtime.block_on(b.fetch())
-    }
-
-    /// Fetch just the price value.
-    pub fn fetch_price(self) -> Result<f64> {
-        self.fetch().map(|r| r.price)
-    }
-
-    /// Fetch total monthly cost based on volume specs.
-    ///
-    /// Requires `size_gb()` to be set. Optionally set `iops()` and `throughput_mibps()`
-    /// for volumes that support provisioned performance (gp3, io2).
-    ///
-    /// The calculation applies baseline allocations:
-    /// - gp3: 3000 IOPS and 125 MiBps included in base price
-    /// - io2: all IOPS are billed (no baseline)
-    ///
-    /// # Example
-    /// ```no_run
-    /// use infracost_rs::blocking::Client;
-    /// use infracost_rs::providers::aws::EbsType;
-    ///
-    /// # fn main() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
-    /// let cost = client.aws().ebs(EbsType::Gp3)
-    ///     .size_gb(500)
-    ///     .iops(6000)
-    ///     .throughput_mibps(250)
-    ///     .fetch_monthly()?;
-    /// // Cost = (500 * $0.08) + (3000 * $0.005) + (125 * $0.04) = $60/month
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn fetch_monthly(self) -> Result<PriceResult> {
-        let mut b = self.client.aws().ebs(self.ebs_type);
-        if let Some(v) = self.region {
-            b = b.region(v);
-        }
-        if let Some(v) = self.api_key {
-            b = b.api_key(v);
-        }
-        if let Some(v) = self.override_default {
-            b = b.override_default(v);
-        }
-        if let Some(v) = self.size_gb {
-            b = b.size_gb(v);
-        }
-        if let Some(v) = self.iops {
-            b = b.iops(v);
-        }
-        if let Some(v) = self.throughput_mibps {
-            b = b.throughput_mibps(v);
-        }
-        self.runtime.block_on(b.fetch_monthly())
+blocking_builder! {
+    /// Blocking builder for querying AWS EBS prices.
+    pub struct BlockingAwsEbsBuilder wraps crate::providers::aws::EbsBuilder {
+        fn size_gb(u64);
+        fn iops(u64);
+        fn throughput_mibps(u64);
     }
 }
 
-// ============================================================
-// BlockingAwsSnapshotBuilder
-// ============================================================
-
-/// Blocking builder for querying AWS EBS Snapshot prices.
-pub struct BlockingAwsSnapshotBuilder {
-    client: crate::Client,
-    runtime: Arc<tokio::runtime::Runtime>,
-    region: Option<String>,
-    api_key: Option<String>,
-    override_default: Option<f64>,
-    size_gb: Option<u64>,
-}
-
-impl BlockingAwsSnapshotBuilder {
-    /// Set the AWS region (e.g., "us-east-1")
-    pub fn region(mut self, region: impl Into<String>) -> Self {
-        self.region = Some(region.into());
-        self
-    }
-
-    /// Set the API key for this request.
-    pub fn api_key(mut self, key: impl Into<String>) -> Self {
-        self.api_key = Some(key.into());
-        self
-    }
-
-    /// Override the default fallback price.
-    pub fn override_default(mut self, price: f64) -> Self {
-        self.override_default = Some(price);
-        self
-    }
-
-    /// Set the snapshot size in GB (required for `fetch_monthly`).
-    pub fn size_gb(mut self, size: u64) -> Self {
-        self.size_gb = Some(size);
-        self
-    }
-
-    /// Fetch the full price result including source information.
-    pub fn fetch(self) -> Result<PriceResult> {
-        let mut b = self.client.aws().snapshot();
-        if let Some(v) = self.region {
-            b = b.region(v);
-        }
-        if let Some(v) = self.api_key {
-            b = b.api_key(v);
-        }
-        if let Some(v) = self.override_default {
-            b = b.override_default(v);
-        }
-        if let Some(v) = self.size_gb {
-            b = b.size_gb(v);
-        }
-        self.runtime.block_on(b.fetch())
-    }
-
-    /// Fetch just the price value.
-    pub fn fetch_price(self) -> Result<f64> {
-        self.fetch().map(|r| r.price)
-    }
-
-    /// Fetch the monthly cost (rate × size_gb).
-    ///
-    /// Requires `size_gb` to be set.
-    pub fn fetch_monthly(self) -> Result<PriceResult> {
-        let mut b = self.client.aws().snapshot();
-        if let Some(v) = self.region {
-            b = b.region(v);
-        }
-        if let Some(v) = self.api_key {
-            b = b.api_key(v);
-        }
-        if let Some(v) = self.override_default {
-            b = b.override_default(v);
-        }
-        if let Some(v) = self.size_gb {
-            b = b.size_gb(v);
-        }
-        self.runtime.block_on(b.fetch_monthly())
+blocking_builder! {
+    /// Blocking builder for querying AWS EBS Snapshot prices.
+    pub struct BlockingAwsSnapshotBuilder wraps crate::providers::aws::SnapshotBuilder {
+        fn size_gb(u64);
     }
 }
 
-// ============================================================
-// BlockingAwsElasticIpBuilder
-// ============================================================
-
-/// Blocking builder for querying AWS Elastic IP prices.
-///
-/// Returns the price for an idle (unused) Elastic IP address.
-pub struct BlockingAwsElasticIpBuilder {
-    client: crate::Client,
-    runtime: Arc<tokio::runtime::Runtime>,
-    region: Option<String>,
-    api_key: Option<String>,
-    override_default: Option<f64>,
-}
-
-impl BlockingAwsElasticIpBuilder {
-    /// Set the AWS region (e.g., "us-east-1")
-    pub fn region(mut self, region: impl Into<String>) -> Self {
-        self.region = Some(region.into());
-        self
-    }
-
-    /// Set the API key for this request.
-    pub fn api_key(mut self, key: impl Into<String>) -> Self {
-        self.api_key = Some(key.into());
-        self
-    }
-
-    /// Override the default fallback price.
-    pub fn override_default(mut self, price: f64) -> Self {
-        self.override_default = Some(price);
-        self
-    }
-
-    /// Fetch the full price result including source information.
-    pub fn fetch(self) -> Result<PriceResult> {
-        let mut b = self.client.aws().elastic_ip();
-        if let Some(v) = self.region {
-            b = b.region(v);
-        }
-        if let Some(v) = self.api_key {
-            b = b.api_key(v);
-        }
-        if let Some(v) = self.override_default {
-            b = b.override_default(v);
-        }
-        self.runtime.block_on(b.fetch())
-    }
-
-    /// Fetch just the price value.
-    pub fn fetch_price(self) -> Result<f64> {
-        self.fetch().map(|r| r.price)
-    }
-
-    /// Fetch the monthly price (hourly price × 730 hours).
-    pub fn fetch_monthly(self) -> Result<PriceResult> {
-        let mut b = self.client.aws().elastic_ip();
-        if let Some(v) = self.region {
-            b = b.region(v);
-        }
-        if let Some(v) = self.api_key {
-            b = b.api_key(v);
-        }
-        if let Some(v) = self.override_default {
-            b = b.override_default(v);
-        }
-        self.runtime.block_on(b.fetch_monthly())
+blocking_builder! {
+    /// Blocking builder for querying AWS Elastic IP prices.
+    pub struct BlockingAwsElasticIpBuilder wraps crate::providers::aws::ElasticIpBuilder {
     }
 }
 
-// ============================================================
-// BlockingAwsNatGatewayBuilder
-// ============================================================
-
-/// Blocking builder for querying AWS NAT Gateway prices.
-///
-/// Returns the hourly rate for NAT Gateway. Additional data processing
-/// charges apply ($0.045/GB).
-pub struct BlockingAwsNatGatewayBuilder {
-    client: crate::Client,
-    runtime: Arc<tokio::runtime::Runtime>,
-    region: Option<String>,
-    api_key: Option<String>,
-    override_default: Option<f64>,
-    data_processed_gb: Option<u64>,
-}
-
-impl BlockingAwsNatGatewayBuilder {
-    /// Set the AWS region (e.g., "us-east-1")
-    pub fn region(mut self, region: impl Into<String>) -> Self {
-        self.region = Some(region.into());
-        self
-    }
-
-    /// Set the API key for this request.
-    pub fn api_key(mut self, key: impl Into<String>) -> Self {
-        self.api_key = Some(key.into());
-        self
-    }
-
-    /// Override the default fallback price.
-    pub fn override_default(mut self, price: f64) -> Self {
-        self.override_default = Some(price);
-        self
-    }
-
-    /// Set the amount of data processed in GB per month.
-    ///
-    /// Required for `fetch_monthly()` to calculate total monthly cost including
-    /// both hourly charges and data processing charges.
-    pub fn data_processed_gb(mut self, gb: u64) -> Self {
-        self.data_processed_gb = Some(gb);
-        self
-    }
-
-    /// Fetch the full price result including source information.
-    pub fn fetch(self) -> Result<PriceResult> {
-        let mut b = self.client.aws().nat_gateway();
-        if let Some(v) = self.region {
-            b = b.region(v);
-        }
-        if let Some(v) = self.api_key {
-            b = b.api_key(v);
-        }
-        if let Some(v) = self.override_default {
-            b = b.override_default(v);
-        }
-        if let Some(v) = self.data_processed_gb {
-            b = b.data_processed_gb(v);
-        }
-        self.runtime.block_on(b.fetch())
-    }
-
-    /// Fetch just the price value.
-    pub fn fetch_price(self) -> Result<f64> {
-        self.fetch().map(|r| r.price)
-    }
-
-    /// Fetch total monthly cost for NAT Gateway.
-    ///
-    /// Calculates: (hourly_rate * 730 hours) + (data_processing_rate * gb_processed)
-    ///
-    /// If `data_processed_gb()` is not set, only returns the hourly cost for 730 hours.
-    ///
-    /// # Example
-    /// ```no_run
-    /// use infracost_rs::blocking::Client;
-    ///
-    /// # fn main() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
-    /// let cost = client.aws().nat_gateway()
-    ///     .region("us-east-1")
-    ///     .data_processed_gb(1000)
-    ///     .fetch_monthly()?;
-    /// // Cost = ($0.045 * 730) + ($0.045 * 1000) = $77.85/month
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn fetch_monthly(self) -> Result<PriceResult> {
-        let mut b = self.client.aws().nat_gateway();
-        if let Some(v) = self.region {
-            b = b.region(v);
-        }
-        if let Some(v) = self.api_key {
-            b = b.api_key(v);
-        }
-        if let Some(v) = self.override_default {
-            b = b.override_default(v);
-        }
-        if let Some(v) = self.data_processed_gb {
-            b = b.data_processed_gb(v);
-        }
-        self.runtime.block_on(b.fetch_monthly())
+blocking_builder! {
+    /// Blocking builder for querying AWS NAT Gateway prices.
+    pub struct BlockingAwsNatGatewayBuilder wraps crate::providers::aws::NatGatewayBuilder {
+        fn data_processed_gb(u64);
     }
 }
 
-// ============================================================
-// BlockingAwsAlbBuilder
-// ============================================================
-
-/// Blocking builder for querying AWS Application Load Balancer prices.
-///
-/// Returns the hourly rate for ALB. Additional LCU (Load Balancer Capacity Units)
-/// charges apply based on usage.
-pub struct BlockingAwsAlbBuilder {
-    client: crate::Client,
-    runtime: Arc<tokio::runtime::Runtime>,
-    region: Option<String>,
-    api_key: Option<String>,
-    override_default: Option<f64>,
-    lcu_hours: Option<u64>,
-}
-
-impl BlockingAwsAlbBuilder {
-    /// Set the AWS region (e.g., "us-east-1")
-    pub fn region(mut self, region: impl Into<String>) -> Self {
-        self.region = Some(region.into());
-        self
-    }
-
-    /// Set the API key for this request.
-    pub fn api_key(mut self, key: impl Into<String>) -> Self {
-        self.api_key = Some(key.into());
-        self
-    }
-
-    /// Override the default fallback price.
-    pub fn override_default(mut self, price: f64) -> Self {
-        self.override_default = Some(price);
-        self
-    }
-
-    /// Set the LCU-hours per month (required for `fetch_monthly`).
-    ///
-    /// LCU (Load Balancer Capacity Unit) is a dimension that represents the resources
-    /// needed to process your traffic. ALB pricing consists of:
-    /// - Hourly charge (~$0.0225/hour = ~$16.43/month for 730 hours)
-    /// - LCU charge (~$0.008/LCU-hour)
-    ///
-    /// The number of LCUs you need depends on your traffic patterns and is calculated
-    /// based on the maximum of:
-    /// - New connections per second
-    /// - Active connections per minute
-    /// - Processed bytes
-    /// - Rule evaluations
-    pub fn lcu_hours(mut self, lcu_hours: u64) -> Self {
-        self.lcu_hours = Some(lcu_hours);
-        self
-    }
-
-    /// Fetch the full price result including source information.
-    pub fn fetch(self) -> Result<PriceResult> {
-        let mut b = self.client.aws().alb();
-        if let Some(v) = self.region {
-            b = b.region(v);
-        }
-        if let Some(v) = self.api_key {
-            b = b.api_key(v);
-        }
-        if let Some(v) = self.override_default {
-            b = b.override_default(v);
-        }
-        if let Some(v) = self.lcu_hours {
-            b = b.lcu_hours(v);
-        }
-        self.runtime.block_on(b.fetch())
-    }
-
-    /// Fetch just the price value.
-    pub fn fetch_price(self) -> Result<f64> {
-        self.fetch().map(|r| r.price)
-    }
-
-    /// Fetch total monthly cost based on hourly rate and LCU usage.
-    ///
-    /// Calculates: (hourly_rate * 730 hours) + (lcu_rate * lcu_hours)
-    ///
-    /// If `lcu_hours()` is not set, only the hourly cost is calculated.
-    ///
-    /// # Example
-    /// ```no_run
-    /// use infracost_rs::blocking::Client;
-    ///
-    /// # fn main() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
-    /// let cost = client.aws().alb()
-    ///     .lcu_hours(10000)
-    ///     .fetch_monthly()?;
-    /// // Cost = ($0.0225 * 730) + ($0.008 * 10000) = $16.43 + $80 = $96.43/month
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn fetch_monthly(self) -> Result<PriceResult> {
-        let mut b = self.client.aws().alb();
-        if let Some(v) = self.region {
-            b = b.region(v);
-        }
-        if let Some(v) = self.api_key {
-            b = b.api_key(v);
-        }
-        if let Some(v) = self.override_default {
-            b = b.override_default(v);
-        }
-        if let Some(v) = self.lcu_hours {
-            b = b.lcu_hours(v);
-        }
-        self.runtime.block_on(b.fetch_monthly())
+blocking_builder! {
+    /// Blocking builder for querying AWS Application Load Balancer prices.
+    pub struct BlockingAwsAlbBuilder wraps crate::providers::aws::AlbBuilder {
+        fn lcu_hours(u64);
     }
 }
 

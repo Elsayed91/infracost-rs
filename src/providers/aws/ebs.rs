@@ -120,8 +120,8 @@ impl From<String> for EbsType {
 // ============================================================
 
 /// Builder for querying AWS EBS prices.
-pub struct EbsBuilder<'a> {
-    client: &'a Client,
+pub struct EbsBuilder {
+    client: Client,
     ebs_type: EbsType,
     region: Option<String>,
     api_key: Option<String>,
@@ -132,9 +132,9 @@ pub struct EbsBuilder<'a> {
     throughput_mibps: Option<u64>,
 }
 
-impl<'a> EbsBuilder<'a> {
+impl EbsBuilder {
     /// Create a new EBS builder
-    pub(crate) fn new(client: &'a Client, ebs_type: EbsType) -> Self {
+    pub(crate) fn new(client: Client, ebs_type: EbsType) -> Self {
         Self {
             client,
             ebs_type,
@@ -198,7 +198,7 @@ impl<'a> EbsBuilder<'a> {
         let resource = aws_catalog().find(self.ebs_type.resource_name())?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         PricingEngine::fetch(
-            self.client,
+            &self.client,
             resource,
             "aws",
             region,
@@ -257,7 +257,7 @@ impl<'a> EbsBuilder<'a> {
 
         if self.ebs_type == EbsType::Io2 {
             PricingEngine::fetch_monthly_with_tiered_queries(
-                self.client,
+                &self.client,
                 resource,
                 "aws",
                 region,
@@ -267,7 +267,7 @@ impl<'a> EbsBuilder<'a> {
             .await
         } else {
             PricingEngine::fetch_monthly(
-                self.client,
+                &self.client,
                 resource,
                 "aws",
                 region,

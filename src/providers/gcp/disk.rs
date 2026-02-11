@@ -201,8 +201,8 @@ impl From<String> for DiskType {
 // ============================================================
 
 /// Builder for querying GCP disk prices.
-pub struct DiskBuilder<'a> {
-    client: &'a Client,
+pub struct DiskBuilder {
+    client: Client,
     disk_type: DiskType,
     region: Option<String>,
     api_key: Option<String>,
@@ -215,9 +215,9 @@ pub struct DiskBuilder<'a> {
     regional: bool,
 }
 
-impl<'a> DiskBuilder<'a> {
+impl DiskBuilder {
     /// Create a new disk builder
-    pub(crate) fn new(client: &'a Client, disk_type: DiskType) -> Self {
+    pub(crate) fn new(client: Client, disk_type: DiskType) -> Self {
         Self {
             client,
             disk_type,
@@ -301,7 +301,7 @@ impl<'a> DiskBuilder<'a> {
         let resource = gcp_catalog().find(self.disk_type.resource_name())?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         let mut result = PricingEngine::fetch(
-            self.client,
+            &self.client,
             resource,
             "gcp",
             region,
@@ -377,7 +377,7 @@ impl<'a> DiskBuilder<'a> {
         }
 
         let mut result = PricingEngine::fetch_monthly(
-            self.client,
+            &self.client,
             resource,
             "gcp",
             region,

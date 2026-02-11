@@ -108,13 +108,13 @@
                 key: description
                 pattern: ".*tier 1|^((?!tier).)*$"
           - limit: 64000
-            default_price: 0.0455
+            default_price: 0.046
             query_filter:
               attribute_regex:
                 key: description
                 pattern: "tier 2"
           - limit: null
-            default_price: 0.03185
+            default_price: 0.032
             query_filter:
               attribute_regex:
                 key: description

@@ -13,16 +13,16 @@ use super::super::PriceResult;
 /// Builder for querying Azure Public IP prices.
 ///
 /// Returns the per-hour price for a Standard static public IPv4 address.
-pub struct PublicIpBuilder<'a> {
-    client: &'a Client,
+pub struct PublicIpBuilder {
+    client: Client,
     region: Option<String>,
     api_key: Option<String>,
     override_default: Option<f64>,
 }
 
-impl<'a> PublicIpBuilder<'a> {
+impl PublicIpBuilder {
     /// Create a new public IP builder
-    pub(crate) fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: Client) -> Self {
         Self {
             client,
             region: None,
@@ -59,7 +59,7 @@ impl<'a> PublicIpBuilder<'a> {
         let resource = azure_catalog().find("public-ip")?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         PricingEngine::fetch(
-            self.client,
+            &self.client,
             resource,
             "azure",
             region,

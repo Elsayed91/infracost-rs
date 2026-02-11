@@ -12,16 +12,16 @@ use super::super::PriceResult;
 // ============================================================
 
 /// Builder for querying GCP static IP prices.
-pub struct StaticIpBuilder<'a> {
-    client: &'a Client,
+pub struct StaticIpBuilder {
+    client: Client,
     region: Option<String>,
     api_key: Option<String>,
     override_default: Option<f64>,
 }
 
-impl<'a> StaticIpBuilder<'a> {
+impl StaticIpBuilder {
     /// Create a new static IP builder
-    pub(crate) fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: Client) -> Self {
         Self {
             client,
             region: None,
@@ -58,7 +58,7 @@ impl<'a> StaticIpBuilder<'a> {
         let resource = gcp_catalog().find("static-ip")?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         PricingEngine::fetch(
-            self.client,
+            &self.client,
             resource,
             "gcp",
             region,
@@ -74,7 +74,7 @@ impl<'a> StaticIpBuilder<'a> {
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         let params = HashMap::new();
         PricingEngine::fetch_monthly(
-            self.client,
+            &self.client,
             resource,
             "gcp",
             region,

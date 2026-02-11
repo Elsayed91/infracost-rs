@@ -179,8 +179,8 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn gcp(&self) -> GcpProvider<'_> {
-        GcpProvider::new(self)
+    pub fn gcp(&self) -> GcpProvider {
+        GcpProvider::new(self.clone())
     }
 
     /// Access AWS resource pricing with built-in defaults.
@@ -202,8 +202,8 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn aws(&self) -> AwsProvider<'_> {
-        AwsProvider::new(self)
+    pub fn aws(&self) -> AwsProvider {
+        AwsProvider::new(self.clone())
     }
 
     /// Access Azure resource pricing with built-in defaults.
@@ -225,8 +225,8 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn azure(&self) -> AzureProvider<'_> {
-        AzureProvider::new(self)
+    pub fn azure(&self) -> AzureProvider {
+        AzureProvider::new(self.clone())
     }
 
     /// Execute a raw query with a filter.

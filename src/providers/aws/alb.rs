@@ -41,8 +41,8 @@ use super::super::PriceResult;
 ///
 /// Returns the hourly rate for ALB. Additional LCU (Load Balancer Capacity Units)
 /// charges apply based on usage.
-pub struct AlbBuilder<'a> {
-    client: &'a Client,
+pub struct AlbBuilder {
+    client: Client,
     region: Option<String>,
     api_key: Option<String>,
     override_default: Option<f64>,
@@ -50,9 +50,9 @@ pub struct AlbBuilder<'a> {
     lcu_hours: Option<u64>,
 }
 
-impl<'a> AlbBuilder<'a> {
+impl AlbBuilder {
     /// Create a new ALB builder
-    pub(crate) fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: Client) -> Self {
         Self {
             client,
             region: None,
@@ -108,7 +108,7 @@ impl<'a> AlbBuilder<'a> {
         let resource = aws_catalog().find("alb")?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         PricingEngine::fetch(
-            self.client,
+            &self.client,
             resource,
             "aws",
             region,
@@ -144,7 +144,7 @@ impl<'a> AlbBuilder<'a> {
             params.insert("lcu_hours".to_string(), lcu);
         }
         PricingEngine::fetch_monthly(
-            self.client,
+            &self.client,
             resource,
             "aws",
             region,

@@ -14,16 +14,16 @@ use super::super::PriceResult;
 /// Builder for querying AWS Elastic IP prices.
 ///
 /// Returns the price for an idle (unused) Elastic IP address.
-pub struct ElasticIpBuilder<'a> {
-    client: &'a Client,
+pub struct ElasticIpBuilder {
+    client: Client,
     region: Option<String>,
     api_key: Option<String>,
     override_default: Option<f64>,
 }
 
-impl<'a> ElasticIpBuilder<'a> {
+impl ElasticIpBuilder {
     /// Create a new Elastic IP builder
-    pub(crate) fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: Client) -> Self {
         Self {
             client,
             region: None,
@@ -61,7 +61,7 @@ impl<'a> ElasticIpBuilder<'a> {
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         let params = HashMap::new();
         PricingEngine::fetch_monthly(
-            self.client,
+            &self.client,
             resource,
             "aws",
             region,
@@ -76,7 +76,7 @@ impl<'a> ElasticIpBuilder<'a> {
         let resource = aws_catalog().find("elastic-ip")?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         PricingEngine::fetch(
-            self.client,
+            &self.client,
             resource,
             "aws",
             region,

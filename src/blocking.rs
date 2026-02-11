@@ -19,6 +19,67 @@
 //! }
 //! ```
 
+/// Generate a blocking builder struct that wraps an async builder.
+///
+/// Common methods (region, api_key, override_default, fetch, fetch_price, fetch_monthly)
+/// are always generated. Additional setter methods can be specified.
+macro_rules! blocking_builder {
+    (
+        $(#[$meta:meta])*
+        pub struct $name:ident wraps $inner:ty {
+            $(fn $setter:ident($ptype:ty);)*
+        }
+    ) => {
+        $(#[$meta])*
+        pub struct $name {
+            inner: $inner,
+            runtime: std::sync::Arc<tokio::runtime::Runtime>,
+        }
+
+        impl $name {
+            /// Set the region.
+            pub fn region(mut self, region: impl Into<String>) -> Self {
+                self.inner = self.inner.region(region);
+                self
+            }
+
+            /// Set the API key for this request.
+            pub fn api_key(mut self, key: impl Into<String>) -> Self {
+                self.inner = self.inner.api_key(key);
+                self
+            }
+
+            /// Override the default fallback price.
+            pub fn override_default(mut self, price: f64) -> Self {
+                self.inner = self.inner.override_default(price);
+                self
+            }
+
+            $(
+                pub fn $setter(mut self, value: $ptype) -> Self {
+                    self.inner = self.inner.$setter(value);
+                    self
+                }
+            )*
+
+            /// Fetch the full price result.
+            pub fn fetch(self) -> crate::error::Result<crate::providers::PriceResult> {
+                self.runtime.block_on(self.inner.fetch())
+            }
+
+            /// Fetch just the price value.
+            pub fn fetch_price(self) -> crate::error::Result<f64> {
+                self.fetch().map(|r| r.price)
+            }
+
+            /// Fetch the total monthly cost.
+            pub fn fetch_monthly(self) -> crate::error::Result<crate::providers::PriceResult> {
+                self.runtime.block_on(self.inner.fetch_monthly())
+            }
+        }
+    };
+}
+
 mod aws;
 mod azure;
 mod gcp;

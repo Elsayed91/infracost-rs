@@ -38,8 +38,8 @@ use super::super::PriceResult;
 // ============================================================
 
 /// Builder for querying GCP Forwarding Rule prices.
-pub struct ForwardingRuleBuilder<'a> {
-    client: &'a Client,
+pub struct ForwardingRuleBuilder {
+    client: Client,
     region: Option<String>,
     api_key: Option<String>,
     override_default: Option<f64>,
@@ -47,9 +47,9 @@ pub struct ForwardingRuleBuilder<'a> {
     data_processed_gb: Option<u64>,
 }
 
-impl<'a> ForwardingRuleBuilder<'a> {
+impl ForwardingRuleBuilder {
     /// Create a new Forwarding Rule builder
-    pub(crate) fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: Client) -> Self {
         Self {
             client,
             region: None,
@@ -94,7 +94,7 @@ impl<'a> ForwardingRuleBuilder<'a> {
         let resource = gcp_catalog().find("forwarding-rule")?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         PricingEngine::fetch(
-            self.client,
+            &self.client,
             resource,
             "gcp",
             region,
@@ -128,7 +128,7 @@ impl<'a> ForwardingRuleBuilder<'a> {
         let mut params = HashMap::new();
         params.insert("data_processed_gb".to_string(), data_gb);
         PricingEngine::fetch_monthly(
-            self.client,
+            &self.client,
             resource,
             "gcp",
             region,

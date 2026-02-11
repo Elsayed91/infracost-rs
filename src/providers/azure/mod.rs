@@ -48,13 +48,13 @@ pub use snapshot::SnapshotBuilder;
 use crate::Client;
 
 /// Azure provider for resource pricing queries.
-pub struct AzureProvider<'a> {
-    pub(crate) client: &'a Client,
+pub struct AzureProvider {
+    pub(crate) client: Client,
 }
 
-impl<'a> AzureProvider<'a> {
+impl AzureProvider {
     /// Create a new Azure provider
-    pub(crate) fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: Client) -> Self {
         Self { client }
     }
 
@@ -84,7 +84,7 @@ impl<'a> AzureProvider<'a> {
         self,
         disk_type: impl Into<ManagedDiskType>,
         size: impl Into<ManagedDiskSize>,
-    ) -> ManagedDiskBuilder<'a> {
+    ) -> ManagedDiskBuilder {
         ManagedDiskBuilder::new(self.client, disk_type.into(), size.into())
     }
 
@@ -108,7 +108,7 @@ impl<'a> AzureProvider<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn snapshot(self) -> SnapshotBuilder<'a> {
+    pub fn snapshot(self) -> SnapshotBuilder {
         SnapshotBuilder::new(self.client)
     }
 
@@ -132,7 +132,7 @@ impl<'a> AzureProvider<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn public_ip(self) -> PublicIpBuilder<'a> {
+    pub fn public_ip(self) -> PublicIpBuilder {
         PublicIpBuilder::new(self.client)
     }
 
@@ -140,7 +140,7 @@ impl<'a> AzureProvider<'a> {
     pub fn managed_disk_from_json(
         self,
         json: &serde_json::Value,
-    ) -> crate::Result<ManagedDiskBuilder<'a>> {
+    ) -> crate::Result<ManagedDiskBuilder> {
         let parsed = from_json::parse_managed_disk_json(json)?;
         let mut builder = ManagedDiskBuilder::new(self.client, parsed.disk_type, parsed.size);
         if let Some(r) = parsed.region {
@@ -150,10 +150,7 @@ impl<'a> AzureProvider<'a> {
     }
 
     /// Parse an Azure snapshot JSON (from `az snapshot show --output json`) into a SnapshotBuilder.
-    pub fn snapshot_from_json(
-        self,
-        json: &serde_json::Value,
-    ) -> crate::Result<SnapshotBuilder<'a>> {
+    pub fn snapshot_from_json(self, json: &serde_json::Value) -> crate::Result<SnapshotBuilder> {
         let parsed = from_json::parse_snapshot_json(json)?;
         let mut builder = SnapshotBuilder::new(self.client);
         if let Some(r) = parsed.region {
@@ -166,10 +163,7 @@ impl<'a> AzureProvider<'a> {
     }
 
     /// Parse an Azure public IP JSON (from `az network public-ip show --output json`) into a PublicIpBuilder.
-    pub fn public_ip_from_json(
-        self,
-        json: &serde_json::Value,
-    ) -> crate::Result<PublicIpBuilder<'a>> {
+    pub fn public_ip_from_json(self, json: &serde_json::Value) -> crate::Result<PublicIpBuilder> {
         let parsed = from_json::parse_public_ip_json(json)?;
         let mut builder = PublicIpBuilder::new(self.client);
         if let Some(r) = parsed.region {

@@ -12,17 +12,17 @@ use super::super::PriceResult;
 // ============================================================
 
 /// Builder for querying GCP snapshot prices.
-pub struct SnapshotBuilder<'a> {
-    client: &'a Client,
+pub struct SnapshotBuilder {
+    client: Client,
     region: Option<String>,
     api_key: Option<String>,
     override_default: Option<f64>,
     size_gb: Option<u64>,
 }
 
-impl<'a> SnapshotBuilder<'a> {
+impl SnapshotBuilder {
     /// Create a new snapshot builder
-    pub(crate) fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: Client) -> Self {
         Self {
             client,
             region: None,
@@ -66,7 +66,7 @@ impl<'a> SnapshotBuilder<'a> {
         let resource = gcp_catalog().find("snapshot")?;
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         PricingEngine::fetch(
-            self.client,
+            &self.client,
             resource,
             "gcp",
             region,
@@ -87,7 +87,7 @@ impl<'a> SnapshotBuilder<'a> {
         let mut params = HashMap::new();
         params.insert("size_gb".to_string(), size);
         PricingEngine::fetch_monthly(
-            self.client,
+            &self.client,
             resource,
             "gcp",
             region,
