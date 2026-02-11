@@ -24,6 +24,7 @@ mod ebs;
 mod ec2_instance;
 mod elastic_ip;
 mod nat_gateway;
+mod rds;
 mod snapshot;
 
 pub use alb::AlbBuilder;
@@ -31,6 +32,7 @@ pub use ebs::{EbsBuilder, EbsType};
 pub use ec2_instance::Ec2InstanceBuilder;
 pub use elastic_ip::ElasticIpBuilder;
 pub use nat_gateway::NatGatewayBuilder;
+pub use rds::{RdsBuilder, RdsStorageType};
 pub use snapshot::SnapshotBuilder;
 
 use crate::Client;
@@ -107,5 +109,15 @@ impl AwsProvider {
     /// Default: $0.0104/hour (t3.micro, Linux, Shared, us-east-1)
     pub fn ec2_instance(self, instance_type: impl Into<String>) -> Ec2InstanceBuilder {
         Ec2InstanceBuilder::new(self.client, instance_type)
+    }
+
+    /// Query AWS RDS (Relational Database Service) pricing.
+    ///
+    /// Pass any RDS instance class string (e.g., "db.t3.micro", "db.m5.large", "db.r5.xlarge").
+    /// Supports all database engines (MySQL, PostgreSQL, MariaDB, Oracle, SQL Server, Aurora).
+    ///
+    /// Default: $0.017/hour (db.t3.micro, MySQL, Single-AZ, us-east-1)
+    pub fn rds(self, instance_class: impl Into<String>) -> RdsBuilder {
+        RdsBuilder::new(self.client, instance_class)
     }
 }

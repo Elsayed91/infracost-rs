@@ -263,6 +263,7 @@ impl EbsBuilder {
                 region,
                 self.api_key.as_deref(),
                 &params,
+                None,
             )
             .await
         } else {
@@ -275,6 +276,7 @@ impl EbsBuilder {
                 &params,
             )
             .await
+
         }
     }
 }

@@ -590,6 +590,22 @@ fn get_default_cpu_price(family: &str, purchase_option: PurchaseOption) -> f64 {
         _ => 0.031611, // Default to N2
     };
 
+    apply_purchase_option_multiplier(base_price, purchase_option)
+}
+
+/// Get default RAM price based on machine family and purchase option.
+fn get_default_ram_price(family: &str, purchase_option: PurchaseOption) -> f64 {
+    let base_price = match family {
+        "N2" => 0.004237,
+        "E2" => 0.00292353,
+        _ => 0.004237, // Default to N2
+    };
+
+    apply_purchase_option_multiplier(base_price, purchase_option)
+}
+
+/// Apply purchase option discount multiplier to a base price.
+fn apply_purchase_option_multiplier(base_price: f64, purchase_option: PurchaseOption) -> f64 {
     match purchase_option {
         PurchaseOption::OnDemand => base_price,
         PurchaseOption::Preemptible => base_price * 0.31, // ~69% discount
@@ -814,6 +830,19 @@ impl ComputeInstanceBuilder {
         params.insert("cpu_cores".to_string(), info.cpu_cores * 730);
         params.insert("memory_gib".to_string(), info.memory_gib * 730);
 
+        // Compute purchase-option-aware default prices for each component.
+        // Without this, spot/CUD fallback defaults would use on-demand prices.
+        let mut default_overrides = HashMap::new();
+        default_overrides.insert(
+            "cpu".to_string(),
+            self.override_default
+                .unwrap_or_else(|| get_default_cpu_price(&info.family, self.purchase_option)),
+        );
+        default_overrides.insert(
+            "memory".to_string(),
+            get_default_ram_price(&info.family, self.purchase_option),
+        );
+
         PricingEngine::fetch_monthly_with_string_params(
             &self.client,
             resource,
@@ -822,6 +851,7 @@ impl ComputeInstanceBuilder {
             self.api_key.as_deref(),
             &params,
             Some(&string_params),
+            Some(&default_overrides),
         )
         .await
     }
@@ -994,5 +1024,96 @@ mod tests {
         // With dynamic defaults, spot pricing should work
         // Preemptible = OnDemand * 0.31 = 0.031611 * 0.31 = 0.00979941
         assert_eq!(result.price, 0.00979941);
+    }
+
+    #[tokio::test]
+    async fn test_spot_fetch_monthly_uses_discounted_defaults() {
+        let client = Client::anonymous();
+
+        // On-demand monthly cost for n2-standard-4 (4 CPU, 16 GiB)
+        let ondemand = client
+            .gcp()
+            .compute_instance()
+            .machine_type("n2-standard-4")
+            .fetch_monthly()
+            .await
+            .unwrap();
+
+        // Spot monthly cost for same machine
+        let spot = client
+            .gcp()
+            .compute_instance()
+            .machine_type("n2-standard-4")
+            .spot()
+            .fetch_monthly()
+            .await
+            .unwrap();
+
+        // Spot should be ~31% of on-demand (not equal!)
+        let ratio = spot.price / ondemand.price;
+        assert!(
+            (ratio - 0.31).abs() < 0.01,
+            "Spot/OnDemand ratio should be ~0.31, got {ratio:.4} (spot={}, ondemand={})",
+            spot.price,
+            ondemand.price
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cud_1yr_fetch_monthly_uses_discounted_defaults() {
+        let client = Client::anonymous();
+
+        let ondemand = client
+            .gcp()
+            .compute_instance()
+            .machine_type("n2-standard-4")
+            .fetch_monthly()
+            .await
+            .unwrap();
+
+        let cud_1yr = client
+            .gcp()
+            .compute_instance()
+            .machine_type("n2-standard-4")
+            .purchase_option(PurchaseOption::Commit1Yr)
+            .fetch_monthly()
+            .await
+            .unwrap();
+
+        // 1yr CUD should be ~63% of on-demand
+        let ratio = cud_1yr.price / ondemand.price;
+        assert!(
+            (ratio - 0.63).abs() < 0.01,
+            "CUD-1yr/OnDemand ratio should be ~0.63, got {ratio:.4}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cud_3yr_fetch_monthly_uses_discounted_defaults() {
+        let client = Client::anonymous();
+
+        let ondemand = client
+            .gcp()
+            .compute_instance()
+            .machine_type("n2-standard-4")
+            .fetch_monthly()
+            .await
+            .unwrap();
+
+        let cud_3yr = client
+            .gcp()
+            .compute_instance()
+            .machine_type("n2-standard-4")
+            .purchase_option(PurchaseOption::Commit3Yr)
+            .fetch_monthly()
+            .await
+            .unwrap();
+
+        // 3yr CUD should be ~45% of on-demand
+        let ratio = cud_3yr.price / ondemand.price;
+        assert!(
+            (ratio - 0.45).abs() < 0.01,
+            "CUD-3yr/OnDemand ratio should be ~0.45, got {ratio:.4}"
+        );
     }
 }

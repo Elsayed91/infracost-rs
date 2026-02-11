@@ -22,7 +22,7 @@
 //! # }
 //! ```
 
-use crate::providers::aws::EbsType;
+use crate::providers::aws::{EbsType, RdsStorageType};
 use std::sync::Arc;
 
 /// Blocking AWS provider for querying AWS resource prices.
@@ -79,6 +79,14 @@ impl BlockingAwsProvider {
             runtime: self.runtime,
         }
     }
+
+    /// Query AWS RDS pricing.
+    pub fn rds(self, instance_class: impl Into<String>) -> BlockingAwsRdsBuilder {
+        BlockingAwsRdsBuilder {
+            inner: self.client.aws().rds(instance_class),
+            runtime: self.runtime,
+        }
+    }
 }
 
 // ============================================================
@@ -130,6 +138,26 @@ blocking_builder! {
     }
 }
 
+blocking_builder! {
+    /// Blocking builder for querying AWS RDS prices.
+    pub struct BlockingAwsRdsBuilder wraps crate::providers::aws::RdsBuilder {
+        fn engine(&str);
+        fn deployment_option(&str);
+        fn storage_type(RdsStorageType);
+        fn allocated_storage_gb(u64);
+        fn iops(u64);
+        fn storage_throughput_mbps(u64);
+    }
+}
+
+impl BlockingAwsRdsBuilder {
+    /// Enable Multi-AZ deployment.
+    pub fn multi_az(mut self) -> Self {
+        self.inner = self.inner.multi_az();
+        self
+    }
+}
+
 // ============================================================
 // Tests
 // ============================================================
@@ -137,7 +165,7 @@ blocking_builder! {
 #[cfg(test)]
 mod tests {
     use crate::blocking::Client;
-    use crate::providers::aws::EbsType;
+    use crate::providers::aws::{EbsType, RdsStorageType};
 
     /// Smoke test: verify blocking_builder! macro works for all AWS builders.
     /// Detailed assertions are in the async builder tests.
@@ -214,6 +242,22 @@ mod tests {
             .operating_system("Windows")
             .tenancy("Shared")
             .fetch()
+            .unwrap();
+
+        // RDS builder
+        let _ = client
+            .aws()
+            .rds("db.t3.micro")
+            .region("us-east-1")
+            .fetch()
+            .unwrap();
+        let _ = client
+            .aws()
+            .rds("db.t3.micro")
+            .engine("mysql")
+            .storage_type(RdsStorageType::Gp3)
+            .allocated_storage_gb(100)
+            .fetch_monthly()
             .unwrap();
     }
 

@@ -58,12 +58,18 @@ impl PricingEngine {
         params: &HashMap<String, u64>,
     ) -> Result<PriceResult> {
         Self::fetch_monthly_with_string_params(
-            client, resource, vendor, region, api_key, params, None,
+            client, resource, vendor, region, api_key, params, None, None,
         )
         .await
     }
 
     /// Fetch total monthly cost with optional string parameters for filter substitution.
+    ///
+    /// `default_overrides` maps component name → override default price. When the API
+    /// is unavailable, the override is used instead of the YAML `default_price`. This is
+    /// needed for resources where the default price depends on runtime parameters like
+    /// purchase_option (spot/preemptible pricing).
+    #[allow(clippy::too_many_arguments)]
     pub async fn fetch_monthly_with_string_params(
         client: &Client,
         resource: &ResourceDef,
@@ -72,18 +78,23 @@ impl PricingEngine {
         api_key: Option<&str>,
         params: &HashMap<String, u64>,
         string_params: Option<&HashMap<String, String>>,
+        default_overrides: Option<&HashMap<String, f64>>,
     ) -> Result<PriceResult> {
         let mut total = 0.0;
         let mut all_from_api = true;
 
         for component in &resource.cost_components {
+            let default_price = default_overrides
+                .and_then(|m| m.get(&component.name).copied())
+                .unwrap_or(component.default_price);
+
             let result = Self::fetch_component_price(
                 client,
                 component,
                 vendor,
                 region,
                 api_key,
-                component.default_price,
+                default_price,
                 string_params,
             )
             .await?;
@@ -398,6 +409,7 @@ impl PricingEngine {
         region: &str,
         api_key: Option<&str>,
         params: &HashMap<String, u64>,
+        default_overrides: Option<&HashMap<String, f64>>,
     ) -> Result<PriceResult> {
         let mut total = 0.0;
         let mut all_from_api = true;
@@ -473,13 +485,17 @@ impl PricingEngine {
                 }
                 _ => {
                     // Non-tiered component: use standard fetch
+                    let default_price = default_overrides
+                        .and_then(|m| m.get(&component.name).copied())
+                        .unwrap_or(component.default_price);
+
                     let result = Self::fetch_component_price(
                         client,
                         component,
                         vendor,
                         region,
                         api_key,
-                        component.default_price,
+                        default_price,
                         None,
                     )
                     .await?;

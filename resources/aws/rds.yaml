@@ -1,0 +1,199 @@
+# RDS Instance compute - uses string params like ec2-instance
+- name: rds
+  display_name: "RDS Database Instance"
+  default_region: us-east-1
+  parameters:
+    - { name: engine, required_for_monthly: false }
+    - { name: instance_class, required_for_monthly: false }
+    - { name: deployment_option, required_for_monthly: false }
+  cost_components:
+    - name: instance
+      is_primary: true
+      unit: hour
+      default_price: 0.017
+      query:
+        service: AmazonRDS
+        product_family: Database Instance
+        attributes:
+          - { key: databaseEngine, value: "{{engine}}" }
+          - { key: instanceType, value: "{{instance_class}}" }
+          - { key: deploymentOption, value: "{{deployment_option}}" }
+      price_filter:
+        purchase_option: on_demand
+      pricing_model:
+        type: hourly_to_monthly
+
+# GP3 storage components
+- name: rds-storage/gp3
+  display_name: "RDS GP3 Storage"
+  default_region: us-east-1
+  parameters:
+    - { name: allocated_storage_gb, required_for_monthly: true }
+    - { name: iops, required_for_monthly: false }
+    - { name: storage_throughput_mbps, required_for_monthly: false }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.115
+      query:
+        service: AmazonRDS
+        product_family: Database Storage
+        attributes:
+          - { key: databaseEngine, value: "{{engine}}" }
+          - { key: volumeType, value: "General Purpose-GP3" }
+          - { key: deploymentOption, value: "{{deployment_option}}" }
+      pricing_model:
+        type: linear
+        quantity_param: allocated_storage_gb
+
+    - name: iops
+      is_primary: false
+      unit: IOPS-month
+      default_price: 0.02
+      query:
+        service: AmazonRDS
+        product_family: Provisioned IOPS
+        attributes:
+          - { key: databaseEngine, value: "{{engine}}" }
+          - { key: groupDescription, value: "RDS Provisioned GP3 IOPS" }
+          - { key: deploymentOption, value: "{{deployment_option}}" }
+      pricing_model:
+        type: linear_with_baseline
+        quantity_param: iops
+        baseline: 3000
+
+    - name: throughput
+      is_primary: false
+      unit: MBps-month
+      default_price: 0.08
+      query:
+        service: AmazonRDS
+        product_family: Provisioned Throughput
+        attributes:
+          - { key: databaseEngine, value: "{{engine}}" }
+          - { key: deploymentOption, value: "{{deployment_option}}" }
+      pricing_model:
+        type: linear_with_baseline
+        quantity_param: storage_throughput_mbps
+        baseline: 125
+
+# GP2 storage (single component)
+- name: rds-storage/gp2
+  display_name: "RDS GP2 Storage"
+  default_region: us-east-1
+  parameters:
+    - { name: allocated_storage_gb, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.115
+      query:
+        service: AmazonRDS
+        product_family: Database Storage
+        attributes:
+          - { key: databaseEngine, value: "{{engine}}" }
+          - { key: volumeType, value: "General Purpose" }
+          - { key: deploymentOption, value: "{{deployment_option}}" }
+      pricing_model:
+        type: linear
+        quantity_param: allocated_storage_gb
+
+# IO1 storage + IOPS
+- name: rds-storage/io1
+  display_name: "RDS IO1 Storage"
+  default_region: us-east-1
+  parameters:
+    - { name: allocated_storage_gb, required_for_monthly: true }
+    - { name: iops, required_for_monthly: false }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.125
+      query:
+        service: AmazonRDS
+        product_family: Database Storage
+        attributes:
+          - { key: databaseEngine, value: "{{engine}}" }
+          - { key: volumeType, value: "Provisioned IOPS" }
+          - { key: deploymentOption, value: "{{deployment_option}}" }
+      pricing_model:
+        type: linear
+        quantity_param: allocated_storage_gb
+
+    - name: iops
+      is_primary: false
+      unit: IOPS-month
+      default_price: 0.10
+      query:
+        service: AmazonRDS
+        product_family: Provisioned IOPS
+        attributes:
+          - { key: databaseEngine, value: "{{engine}}" }
+          - { key: groupDescription, value: "RDS Provisioned IOPS" }
+          - { key: deploymentOption, value: "{{deployment_option}}" }
+      pricing_model:
+        type: linear
+        quantity_param: iops
+
+# IO2 storage + IOPS
+- name: rds-storage/io2
+  display_name: "RDS IO2 Storage"
+  default_region: us-east-1
+  parameters:
+    - { name: allocated_storage_gb, required_for_monthly: true }
+    - { name: iops, required_for_monthly: false }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.125
+      query:
+        service: AmazonRDS
+        product_family: Database Storage
+        attributes:
+          - { key: databaseEngine, value: "{{engine}}" }
+          - { key: volumeType, value: "Provisioned IOPS-IO2" }
+          - { key: deploymentOption, value: "{{deployment_option}}" }
+      pricing_model:
+        type: linear
+        quantity_param: allocated_storage_gb
+
+    - name: iops
+      is_primary: false
+      unit: IOPS-month
+      default_price: 0.10
+      query:
+        service: AmazonRDS
+        product_family: Provisioned IOPS
+        attributes:
+          - { key: databaseEngine, value: "{{engine}}" }
+          - { key: groupDescription, value: "RDS Provisioned IO2 IOPS" }
+          - { key: deploymentOption, value: "{{deployment_option}}" }
+      pricing_model:
+        type: linear
+        quantity_param: iops
+
+# Magnetic storage (single component)
+- name: rds-storage/magnetic
+  display_name: "RDS Magnetic Storage"
+  default_region: us-east-1
+  parameters:
+    - { name: allocated_storage_gb, required_for_monthly: true }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GB-month
+      default_price: 0.10
+      query:
+        service: AmazonRDS
+        product_family: Database Storage
+        attributes:
+          - { key: databaseEngine, value: "{{engine}}" }
+          - { key: volumeType, value: "Magnetic" }
+          - { key: deploymentOption, value: "{{deployment_option}}" }
+      pricing_model:
+        type: linear
+        quantity_param: allocated_storage_gb

@@ -40,6 +40,7 @@ pub static AWS_CATALOG: LazyLock<ResourceCatalog> = LazyLock::new(|| {
             include_str!("../../resources/aws/nat-gateway.yaml"),
             include_str!("../../resources/aws/alb.yaml"),
             include_str!("../../resources/aws/ec2-instance.yaml"),
+            include_str!("../../resources/aws/rds.yaml"),
         ],
     )
 });
@@ -103,6 +104,12 @@ mod tests {
         assert!(cat.find("nat-gateway").is_ok());
         assert!(cat.find("alb").is_ok());
         assert!(cat.find("ec2-instance").is_ok());
+        assert!(cat.find("rds").is_ok());
+        assert!(cat.find("rds-storage/gp3").is_ok());
+        assert!(cat.find("rds-storage/gp2").is_ok());
+        assert!(cat.find("rds-storage/io1").is_ok());
+        assert!(cat.find("rds-storage/io2").is_ok());
+        assert!(cat.find("rds-storage/magnetic").is_ok());
     }
 
     #[test]

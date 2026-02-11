@@ -171,6 +171,7 @@ impl Ec2InstanceBuilder {
             self.api_key.as_deref(),
             &params,
             Some(&string_params),
+            None,
         )
         .await
     }
