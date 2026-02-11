@@ -15,8 +15,8 @@
 //! cargo test --test aws_rds_regional_pricing -- --ignored
 //! ```
 
-use infracost_rs::providers::aws::RdsStorageType;
 use infracost_rs::providers::PriceSource;
+use infracost_rs::providers::aws::RdsStorageType;
 use infracost_rs::{Client, ProductFilter};
 
 /// Helper to get a client with API key from environment
@@ -213,9 +213,7 @@ async fn test_rds_gp3_storage_ap_northeast_1() -> Result<(), Box<dyn std::error:
 }
 
 /// Helper function to test GP3 storage pricing for a specific region
-async fn test_gp3_storage_region_pricing(
-    region: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_gp3_storage_region_pricing(region: &str) -> Result<(), Box<dyn std::error::Error>> {
     let client = get_client()?;
 
     // Query GP3 storage pricing directly
@@ -454,10 +452,7 @@ async fn test_rds_different_engines() -> Result<(), Box<dyn std::error::Error>> 
     assert!(postgres_result.price > 0.0);
     assert!(mariadb_result.price > 0.0);
 
-    println!(
-        "Engine pricing for {} in {}:",
-        instance_class, region
-    );
+    println!("Engine pricing for {} in {}:", instance_class, region);
     println!("  MySQL: ${}/hour", mysql_result.price);
     println!("  PostgreSQL: ${}/hour", postgres_result.price);
     println!("  MariaDB: ${}/hour", mariadb_result.price);
@@ -485,10 +480,7 @@ async fn test_rds_engines_across_regions() -> Result<(), Box<dyn std::error::Err
             assert!(result.price > 0.0);
             assert_eq!(result.unit, "hour");
 
-            println!(
-                "{} in {}: ${}/hour",
-                engine, region, result.price
-            );
+            println!("{} in {}: ${}/hour", engine, region, result.price);
         }
     }
 
@@ -551,7 +543,10 @@ async fn test_rds_multi_az_pricing() -> Result<(), Box<dyn std::error::Error>> {
         instance_class, region
     );
     println!("  Single-AZ: ${}/hour", single_az.price);
-    println!("  Multi-AZ: ${}/hour (ratio: {:.2}x)", multi_az.price, ratio);
+    println!(
+        "  Multi-AZ: ${}/hour (ratio: {:.2}x)",
+        multi_az.price, ratio
+    );
 
     Ok(())
 }
@@ -680,7 +675,11 @@ async fn test_rds_storage_types_across_regions() -> Result<(), Box<dyn std::erro
             .build();
 
         let gp3_products = client.query_products(gp3_filter).await?;
-        assert!(!gp3_products.is_empty(), "GP3 should be available in {}", region);
+        assert!(
+            !gp3_products.is_empty(),
+            "GP3 should be available in {}",
+            region
+        );
         let gp3_price = gp3_products[0].first_nonzero_price_or(0.115);
 
         // Test GP2
@@ -695,7 +694,11 @@ async fn test_rds_storage_types_across_regions() -> Result<(), Box<dyn std::erro
             .build();
 
         let gp2_products = client.query_products(gp2_filter).await?;
-        assert!(!gp2_products.is_empty(), "GP2 should be available in {}", region);
+        assert!(
+            !gp2_products.is_empty(),
+            "GP2 should be available in {}",
+            region
+        );
         let gp2_price = gp2_products[0].first_nonzero_price_or(0.115);
 
         // Test IO1
@@ -710,7 +713,11 @@ async fn test_rds_storage_types_across_regions() -> Result<(), Box<dyn std::erro
             .build();
 
         let io1_products = client.query_products(io1_filter).await?;
-        assert!(!io1_products.is_empty(), "IO1 should be available in {}", region);
+        assert!(
+            !io1_products.is_empty(),
+            "IO1 should be available in {}",
+            region
+        );
         let io1_price = io1_products[0].first_nonzero_price_or(0.125);
 
         assert!(gp3_price > 0.0);
@@ -761,10 +768,7 @@ async fn test_rds_monthly_with_gp3_and_iops() -> Result<(), Box<dyn std::error::
         monthly.price
     );
 
-    println!(
-        "Monthly with GP3 + IOPS: ${}/month",
-        monthly.price
-    );
+    println!("Monthly with GP3 + IOPS: ${}/month", monthly.price);
 
     Ok(())
 }
@@ -799,10 +803,7 @@ async fn test_rds_monthly_with_gp3_and_throughput() -> Result<(), Box<dyn std::e
         monthly.price
     );
 
-    println!(
-        "Monthly with GP3 + throughput: ${}/month",
-        monthly.price
-    );
+    println!("Monthly with GP3 + throughput: ${}/month", monthly.price);
 
     Ok(())
 }
@@ -839,10 +840,7 @@ async fn test_rds_monthly_full_spec() -> Result<(), Box<dyn std::error::Error>> 
         monthly.price
     );
 
-    println!(
-        "Monthly with full GP3 spec: ${}/month",
-        monthly.price
-    );
+    println!("Monthly with full GP3 spec: ${}/month", monthly.price);
 
     Ok(())
 }
@@ -887,10 +885,7 @@ async fn test_rds_different_instance_types() -> Result<(), Box<dyn std::error::E
         micro_result.price
     );
 
-    println!(
-        "Instance type pricing in {}:",
-        region
-    );
+    println!("Instance type pricing in {}:", region);
     println!("  db.t3.micro: ${}/hour", micro_result.price);
     println!("  db.m5.xlarge: ${}/hour", xlarge_result.price);
 

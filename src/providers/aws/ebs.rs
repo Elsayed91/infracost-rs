@@ -276,7 +276,6 @@ impl EbsBuilder {
                 &params,
             )
             .await
-
         }
     }
 }

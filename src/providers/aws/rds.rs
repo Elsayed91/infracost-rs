@@ -292,9 +292,9 @@ impl RdsBuilder {
         let region = self.region.as_deref().unwrap_or(&resource.default_region);
         let string_params = self.build_string_params();
 
-        let default_price = self.override_default.unwrap_or(
-            resource.cost_components[0].default_price * self.deployment_multiplier(),
-        );
+        let default_price = self
+            .override_default
+            .unwrap_or(resource.cost_components[0].default_price * self.deployment_multiplier());
         let component = &resource.cost_components[0];
 
         PricingEngine::fetch_component_price(
@@ -390,8 +390,7 @@ impl RdsBuilder {
             // Compute deployment-option-aware storage defaults
             let mut storage_defaults = HashMap::new();
             for comp in &storage_resource.cost_components {
-                storage_defaults
-                    .insert(comp.name.clone(), comp.default_price * multiplier);
+                storage_defaults.insert(comp.name.clone(), comp.default_price * multiplier);
             }
 
             let storage_result = PricingEngine::fetch_monthly_with_string_params(
