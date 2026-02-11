@@ -20,6 +20,7 @@
 //! ```
 
 mod backend_service;
+mod compute_instance;
 mod disk;
 mod forwarding_rule;
 mod nat_gateway;
@@ -27,6 +28,7 @@ mod snapshot;
 mod static_ip;
 
 pub use backend_service::{BackendServiceBuilder, BackendServiceTier};
+pub use compute_instance::{ComputeInstanceBuilder, MachineFamily};
 pub use disk::{DiskBuilder, DiskType};
 pub use forwarding_rule::ForwardingRuleBuilder;
 pub use nat_gateway::NatGatewayBuilder;
@@ -124,5 +126,35 @@ impl GcpProvider {
     /// ```
     pub fn backend_service(self, tier: impl Into<BackendServiceTier>) -> BackendServiceBuilder {
         BackendServiceBuilder::new(self.client, tier.into())
+    }
+
+    /// Query GCP Compute Instance pricing.
+    ///
+    /// Compute instances are priced by CPU cores and RAM separately.
+    /// Use `cpu_cores()` and `memory_gib()` to calculate total monthly cost.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use infracost_rs::Client;
+    /// use infracost_rs::providers::gcp::MachineFamily;
+    ///
+    /// # async fn example() -> Result<(), infracost_rs::Error> {
+    /// let client = Client::anonymous();
+    /// let cost = client
+    ///     .gcp()
+    ///     .compute_instance(MachineFamily::N2)
+    ///     .cpu_cores(4)
+    ///     .memory_gib(16)
+    ///     .fetch_monthly()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn compute_instance(
+        self,
+        machine_family: impl Into<MachineFamily>,
+    ) -> ComputeInstanceBuilder {
+        ComputeInstanceBuilder::new(self.client, machine_family.into())
     }
 }

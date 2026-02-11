@@ -68,16 +68,6 @@ let r = client.aws().alb().region("us-east-1").fetch().await?;
 // r.price = 0.0225, r.unit = "hour"
 ```
 
-## From CLI JSON
-
-```rust
-// Parse `aws ec2 describe-volumes` output directly
-let ebs = client.aws().ebs_from_json(&volume_json)?;
-let price = ebs.fetch_monthly().await?;
-
-// Also: snapshot_from_json, elastic_ip_from_json, nat_gateway_from_json, alb_from_json
-```
-
 ## Common Patterns
 
 ```rust

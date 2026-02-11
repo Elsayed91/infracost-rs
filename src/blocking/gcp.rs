@@ -21,7 +21,7 @@
 //! }
 //! ```
 
-use crate::providers::gcp::{BackendServiceTier, DiskType};
+use crate::providers::gcp::{BackendServiceTier, DiskType, MachineFamily};
 use std::sync::Arc;
 
 // ============================================================
@@ -87,6 +87,17 @@ impl BlockingGcpProvider {
             runtime: self.runtime,
         }
     }
+
+    /// Query GCP Compute Instance pricing.
+    pub fn compute_instance(
+        self,
+        machine_family: impl Into<MachineFamily>,
+    ) -> BlockingGcpComputeInstanceBuilder {
+        BlockingGcpComputeInstanceBuilder {
+            inner: self.client.gcp().compute_instance(machine_family),
+            runtime: self.runtime,
+        }
+    }
 }
 
 // ============================================================
@@ -135,6 +146,14 @@ blocking_builder! {
     pub struct BlockingGcpBackendServiceBuilder wraps crate::providers::gcp::BackendServiceBuilder {
         fn data_processed_gb(u64);
         fn forwarding_rules(u64);
+    }
+}
+
+blocking_builder! {
+    /// Blocking builder for querying GCP Compute Instance prices.
+    pub struct BlockingGcpComputeInstanceBuilder wraps crate::providers::gcp::ComputeInstanceBuilder {
+        fn cpu_cores(u64);
+        fn memory_gib(u64);
     }
 }
 
@@ -236,6 +255,28 @@ mod tests {
             .gcp()
             .backend_service(BackendServiceTier::Standard)
             .data_processed_gb(1000)
+            .fetch_monthly()
+            .unwrap();
+
+        // Compute Instance builder
+        let _ = client
+            .gcp()
+            .compute_instance(MachineFamily::N2)
+            .region("us-central1")
+            .fetch()
+            .unwrap();
+        let _ = client
+            .gcp()
+            .compute_instance(MachineFamily::N2)
+            .cpu_cores(4)
+            .memory_gib(16)
+            .fetch_monthly()
+            .unwrap();
+        let _ = client
+            .gcp()
+            .compute_instance(MachineFamily::E2Spot)
+            .cpu_cores(2)
+            .memory_gib(8)
             .fetch_monthly()
             .unwrap();
     }

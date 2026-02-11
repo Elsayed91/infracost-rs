@@ -24,6 +24,7 @@ pub static GCP_CATALOG: LazyLock<ResourceCatalog> = LazyLock::new(|| {
             include_str!("../../resources/gcp/nat-gateway.yaml"),
             include_str!("../../resources/gcp/forwarding-rule.yaml"),
             include_str!("../../resources/gcp/backend-service.yaml"),
+            include_str!("../../resources/gcp/compute-instance.yaml"),
         ],
     )
 });
@@ -87,6 +88,10 @@ mod tests {
         assert!(cat.find("backend-service").is_ok());
         assert!(cat.find("backend-service/premium").is_ok());
         assert!(cat.find("backend-service/standard").is_ok());
+        assert!(cat.find("compute-instance/n2").is_ok());
+        assert!(cat.find("compute-instance/n2-spot").is_ok());
+        assert!(cat.find("compute-instance/e2").is_ok());
+        assert!(cat.find("compute-instance/e2-spot").is_ok());
     }
 
     #[test]

@@ -213,6 +213,8 @@ pub fn your_resource(self) -> Blocking{Vendor}{Resource}Builder {
 }
 ```
 
+Blocking tests are smoke tests only (one per vendor file). They verify the wrappers compile and execute but don't duplicate the async builder assertions. Add your new builder to the existing smoke test function.
+
 ## 6. Test
 
 ```bash
@@ -229,6 +231,7 @@ INFRACOST_API_KEY=xxx cargo test --test your_test -- --ignored  # integration
 - [ ] Unit tests pass without API key
 - [ ] Integration tests pass with API key
 - [ ] Blocking wrapper exists (via `blocking_builder!`)
+- [ ] Added to blocking smoke test
 - [ ] `cargo clippy --all-features` clean
 
 AI-automated workflow: `/add-resource` skill (`.claude/skills/add-resource/SKILL.md`)

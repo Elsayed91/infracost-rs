@@ -85,16 +85,6 @@ let r = client.gcp().forwarding_rule()
 // uptime ($0.025 * 730) + data ($0.008 * 1000) = $26.25
 ```
 
-## From CLI JSON
-
-```rust
-// Parse `gcloud compute disks describe --format=json` output
-let disk = client.gcp().disk_from_json(&disk_json)?;
-let price = disk.fetch_monthly().await?;
-
-// Also: snapshot_from_json, static_ip_from_json, nat_gateway_from_json
-```
-
 ## Common Patterns
 
 ```rust

@@ -24,18 +24,15 @@ src/
     macros.rs                   resource_builder! macro - generates builders for simple/required/optional param cases
     aws/mod.rs                  AwsProvider + re-exports
     aws/{resource}.rs           per-resource async builders (macro-based or hand-written)
-    aws/from_json.rs            parse AWS CLI JSON into builders
     gcp/mod.rs                  GcpProvider + re-exports
     gcp/{resource}.rs           per-resource async builders (macro-based or hand-written)
-    gcp/from_json.rs            parse gcloud JSON into builders
     azure/mod.rs                AzureProvider + re-exports
-    json_utils.rs               shared helpers: parse_u64, zone_to_region, etc.
 
   blocking/
     mod.rs                      blocking::Client + blocking_builder! macro
-    aws.rs                      blocking wrappers (blocking_builder! invocations + provider methods)
-    gcp.rs                      blocking wrappers (blocking_builder! invocations + provider methods)
-    azure.rs                    blocking wrappers (blocking_builder! invocations + provider methods)
+    aws.rs                      blocking wrappers (blocking_builder! invocations + smoke test)
+    gcp.rs                      blocking wrappers (blocking_builder! invocations + smoke test)
+    azure.rs                    blocking wrappers (blocking_builder! invocations + smoke test)
 
 tests/                          integration tests (require API key, #[ignore])
 examples/                       runnable usage examples per vendor/resource
@@ -74,12 +71,19 @@ Two macros power most builders:
 - Wraps async builder directly: `{ inner: AsyncBuilder, runtime: Arc<Runtime> }`
 - Delegates all methods to the wrapped async builder
 - Extra setters listed in the macro invocation
+- All blocking builders use this macro (no hand-written blocking code)
 
-**4 hand-written builders** for complex cases:
+**4 hand-written async builders** for complex cases:
 - `aws/ebs.rs` - 3 params, tiered IOPS pricing, baseline-aware logic
 - `gcp/disk.rs` - 4 params, conditional regional pricing, pd-extreme IOPS
 - `gcp/backend_service.rs` - dual-query logic (data + forwarding rules)
 - `azure/managed_disk.rs` - constructor requires type+size params, fixed SKU pricing
+
+## Testing Strategy
+
+- **Async builder unit tests** - detailed assertions (default prices, monthly calculations, edge cases)
+- **Blocking smoke tests** - one test per vendor verifying all blocking wrappers compile and execute (no duplicated assertions)
+- **Integration tests** - `tests/` directory, require API key, test across 7+ regions
 
 ## Key Types
 

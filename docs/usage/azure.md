@@ -54,16 +54,6 @@ let r = client.azure().public_ip().fetch_monthly().await?;
 // r.price = 3.65
 ```
 
-## From CLI JSON
-
-```rust
-// Parse `az disk show` output
-let disk = client.azure().managed_disk_from_json(&disk_json)?;
-let price = disk.fetch().await?;
-
-// Also: snapshot_from_json, public_ip_from_json
-```
-
 ## Common Patterns
 
 ```rust
