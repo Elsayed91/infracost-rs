@@ -22,7 +22,6 @@
 mod alb;
 mod ebs;
 mod elastic_ip;
-pub(crate) mod from_json;
 mod nat_gateway;
 mod snapshot;
 
@@ -32,7 +31,7 @@ pub use elastic_ip::ElasticIpBuilder;
 pub use nat_gateway::NatGatewayBuilder;
 pub use snapshot::SnapshotBuilder;
 
-use crate::{Client, Result};
+use crate::Client;
 
 /// AWS provider for querying AWS resource prices.
 pub struct AwsProvider {
@@ -96,67 +95,5 @@ impl AwsProvider {
     /// Note: Additional LCU charges apply
     pub fn alb(self) -> AlbBuilder {
         AlbBuilder::new(self.client)
-    }
-
-    /// Parse an AWS EBS volume JSON (from `aws ec2 describe-volumes`) into an [`EbsBuilder`].
-    pub fn ebs_from_json(self, json: &serde_json::Value) -> Result<EbsBuilder> {
-        let parsed = from_json::parse_ebs_json(json)?;
-        let mut builder = EbsBuilder::new(self.client, parsed.ebs_type);
-        if let Some(r) = parsed.region {
-            builder = builder.region(r);
-        }
-        if let Some(s) = parsed.size_gb {
-            builder = builder.size_gb(s);
-        }
-        if let Some(i) = parsed.iops {
-            builder = builder.iops(i);
-        }
-        if let Some(t) = parsed.throughput_mibps {
-            builder = builder.throughput_mibps(t);
-        }
-        Ok(builder)
-    }
-
-    /// Parse an AWS EBS Snapshot JSON (from `aws ec2 describe-snapshots`) into a [`SnapshotBuilder`].
-    pub fn snapshot_from_json(self, json: &serde_json::Value) -> Result<SnapshotBuilder> {
-        let parsed = from_json::parse_snapshot_json(json)?;
-        let mut builder = SnapshotBuilder::new(self.client);
-        if let Some(r) = parsed.region {
-            builder = builder.region(r);
-        }
-        if let Some(s) = parsed.size_gb {
-            builder = builder.size_gb(s);
-        }
-        Ok(builder)
-    }
-
-    /// Parse an AWS Elastic IP JSON (from `aws ec2 describe-addresses`) into an [`ElasticIpBuilder`].
-    pub fn elastic_ip_from_json(self, json: &serde_json::Value) -> Result<ElasticIpBuilder> {
-        let parsed = from_json::parse_elastic_ip_json(json)?;
-        let mut builder = ElasticIpBuilder::new(self.client);
-        if let Some(r) = parsed.region {
-            builder = builder.region(r);
-        }
-        Ok(builder)
-    }
-
-    /// Parse an AWS NAT Gateway JSON (from `aws ec2 describe-nat-gateways`) into a [`NatGatewayBuilder`].
-    pub fn nat_gateway_from_json(self, json: &serde_json::Value) -> Result<NatGatewayBuilder> {
-        let parsed = from_json::parse_nat_gateway_json(json)?;
-        let mut builder = NatGatewayBuilder::new(self.client);
-        if let Some(r) = parsed.region {
-            builder = builder.region(r);
-        }
-        Ok(builder)
-    }
-
-    /// Parse an AWS ALB JSON (from `aws elbv2 describe-load-balancers`) into an [`AlbBuilder`].
-    pub fn alb_from_json(self, json: &serde_json::Value) -> Result<AlbBuilder> {
-        let parsed = from_json::parse_alb_json(json)?;
-        let mut builder = AlbBuilder::new(self.client);
-        if let Some(r) = parsed.region {
-            builder = builder.region(r);
-        }
-        Ok(builder)
     }
 }

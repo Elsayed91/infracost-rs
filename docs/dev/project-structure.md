@@ -21,20 +21,21 @@ src/
 
   providers/
     mod.rs                      PriceResult, PriceSource
+    macros.rs                   resource_builder! macro - generates builders for simple/required/optional param cases
     aws/mod.rs                  AwsProvider + re-exports
-    aws/{resource}.rs           per-resource async builders
+    aws/{resource}.rs           per-resource async builders (macro-based or hand-written)
     aws/from_json.rs            parse AWS CLI JSON into builders
     gcp/mod.rs                  GcpProvider + re-exports
-    gcp/{resource}.rs           per-resource async builders
+    gcp/{resource}.rs           per-resource async builders (macro-based or hand-written)
     gcp/from_json.rs            parse gcloud JSON into builders
     azure/mod.rs                AzureProvider + re-exports
     json_utils.rs               shared helpers: parse_u64, zone_to_region, etc.
 
   blocking/
-    mod.rs                      blocking::Client
-    aws.rs                      sync mirrors of async AWS builders
-    gcp.rs                      sync mirrors of async GCP builders
-    azure.rs                    sync mirrors of async Azure builders
+    mod.rs                      blocking::Client + blocking_builder! macro
+    aws.rs                      blocking wrappers (blocking_builder! invocations + provider methods)
+    gcp.rs                      blocking wrappers (blocking_builder! invocations + provider methods)
+    azure.rs                    blocking wrappers (blocking_builder! invocations + provider methods)
 
 tests/                          integration tests (require API key, #[ignore])
 examples/                       runnable usage examples per vendor/resource
@@ -59,6 +60,27 @@ PricingEngine::fetch() / fetch_monthly()
 PriceResult { price, unit, source }
 ```
 
+## Builder Architecture
+
+Two macros power most builders:
+
+**`resource_builder!`** (`src/providers/macros.rs`) - generates async builders:
+- 3 variants: simple (no params), required param, optional param
+- Generates struct with `client: Client` (owned, no lifetimes), `region`, `api_key`, `override_default`
+- Generates `new()`, `region()`, `api_key()`, `override_default()`, `fetch()`, `fetch_price()`, `fetch_monthly()`
+- 10 of 14 builders use this macro
+
+**`blocking_builder!`** (`src/blocking/mod.rs`) - generates blocking wrappers:
+- Wraps async builder directly: `{ inner: AsyncBuilder, runtime: Arc<Runtime> }`
+- Delegates all methods to the wrapped async builder
+- Extra setters listed in the macro invocation
+
+**4 hand-written builders** for complex cases:
+- `aws/ebs.rs` - 3 params, tiered IOPS pricing, baseline-aware logic
+- `gcp/disk.rs` - 4 params, conditional regional pricing, pd-extreme IOPS
+- `gcp/backend_service.rs` - dual-query logic (data + forwarding rules)
+- `azure/managed_disk.rs` - constructor requires type+size params, fixed SKU pricing
+
 ## Key Types
 
 | Type | Location | Purpose |
@@ -69,3 +91,4 @@ PriceResult { price, unit, source }
 | `PricingEngine` | `catalog/engine.rs` | Does all the work: query, filter, calculate |
 | `PriceResult` | `providers/mod.rs` | What you get back: price + unit + source |
 | `ProductFilter` | `types.rs` | Raw API query builder (used by engine internally) |
+| `Client` | `client.rs` | `Arc<ClientInner>` - cheap to clone, owned by builders |

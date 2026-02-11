@@ -26,122 +26,26 @@
 //! # }
 //! ```
 
-use std::collections::HashMap;
-
-use crate::catalog::{engine::PricingEngine, gcp_catalog};
-use crate::{Client, Result};
-
-use super::super::PriceResult;
+use crate::providers::macros::resource_builder;
 
 // ============================================================
 // Builder
 // ============================================================
 
-/// Builder for querying GCP Forwarding Rule prices.
-pub struct ForwardingRuleBuilder {
-    client: Client,
-    region: Option<String>,
-    api_key: Option<String>,
-    override_default: Option<f64>,
-    // Data volume for monthly cost calculation
-    data_processed_gb: Option<u64>,
-}
-
-impl ForwardingRuleBuilder {
-    /// Create a new Forwarding Rule builder
-    pub(crate) fn new(client: Client) -> Self {
-        Self {
-            client,
-            region: None,
-            api_key: None,
-            override_default: None,
-            data_processed_gb: None,
-        }
-    }
-
-    /// Set the GCP region (e.g., "us-central1")
-    pub fn region(mut self, region: impl Into<String>) -> Self {
-        self.region = Some(region.into());
-        self
-    }
-
-    /// Set the API key for this request.
-    pub fn api_key(mut self, key: impl Into<String>) -> Self {
-        self.api_key = Some(key.into());
-        self
-    }
-
-    /// Override the default fallback price.
-    pub fn override_default(mut self, price: f64) -> Self {
-        self.override_default = Some(price);
-        self
-    }
-
-    /// Set the amount of data processed in GB per month (required for `fetch_monthly`).
-    pub fn data_processed_gb(mut self, gb: u64) -> Self {
-        self.data_processed_gb = Some(gb);
-        self
-    }
-
-    /// Fetch just the price value.
-    pub async fn fetch_price(self) -> Result<f64> {
-        self.fetch().await.map(|r| r.price)
-    }
-
-    /// Fetch the full price result including source information.
-    /// Returns the hourly uptime charge only (no data processing).
-    pub async fn fetch(self) -> Result<PriceResult> {
-        let resource = gcp_catalog().find("forwarding-rule")?;
-        let region = self.region.as_deref().unwrap_or(&resource.default_region);
-        PricingEngine::fetch(
-            &self.client,
-            resource,
-            "gcp",
-            region,
-            self.api_key.as_deref(),
-            self.override_default,
-        )
-        .await
-    }
-
-    /// Fetch total monthly cost based on data processing usage.
-    ///
-    /// Calculates: (hourly_rate * 730 hours) + (data_rate * gb_processed)
-    ///
-    /// # Example
-    /// ```rust,no_run
-    /// # use infracost_rs::Client;
-    /// # async fn example() -> infracost_rs::Result<()> {
-    /// let client = Client::new("api-key");
-    /// let cost = client.gcp().forwarding_rule()
-    ///     .region("us-central1")
-    ///     .data_processed_gb(1000)
-    ///     .fetch_monthly().await?;
-    /// // Cost = ($0.025 * 730) + ($0.008 * 1000) = $26.25/month
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn fetch_monthly(self) -> Result<PriceResult> {
-        let resource = gcp_catalog().find("forwarding-rule")?;
-        let region = self.region.as_deref().unwrap_or(&resource.default_region);
-        let data_gb = self.data_processed_gb.unwrap_or(0);
-        let mut params = HashMap::new();
-        params.insert("data_processed_gb".to_string(), data_gb);
-        PricingEngine::fetch_monthly(
-            &self.client,
-            resource,
-            "gcp",
-            region,
-            self.api_key.as_deref(),
-            &params,
-        )
-        .await
+resource_builder! {
+    /// Builder for querying GCP Forwarding Rule prices.
+    pub struct ForwardingRuleBuilder {
+        catalog: gcp_catalog,
+        resource: "forwarding-rule",
+        vendor: "gcp",
+        optional param: data_processed_gb(u64),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Client;
 
     #[tokio::test]
     async fn test_forwarding_rule_builder_returns_default_without_api_key() {

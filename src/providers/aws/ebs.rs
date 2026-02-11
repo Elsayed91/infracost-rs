@@ -48,8 +48,8 @@ pub enum EbsType {
     Gp2,
     /// Provisioned IOPS SSD (io2) - high performance with tiered IOPS pricing
     /// - Tier 1: 1-32,000 IOPS at $0.065/IOPS-Mo
-    /// - Tier 2: 32,001-64,000 IOPS at $0.0455/IOPS-Mo
-    /// - Tier 3: 64,001+ IOPS at $0.03185/IOPS-Mo
+    /// - Tier 2: 32,001-64,000 IOPS at $0.046/IOPS-Mo
+    /// - Tier 3: 64,001+ IOPS at $0.032/IOPS-Mo
     Io2,
     /// Throughput Optimized HDD (st1) - low cost, frequently accessed
     St1,
@@ -501,8 +501,8 @@ mod tests {
     #[tokio::test]
     async fn test_io2_fetch_monthly_tier1_and_tier2_iops() {
         // 100 GB io2 with 50,000 IOPS (spans tier 1 and tier 2)
-        // Cost = (100 * $0.125) + (32,000 * $0.065) + (18,000 * $0.0455)
-        //      = $12.5 + $2,080 + $819 = $2,911.5/month
+        // Cost = (100 * $0.125) + (32,000 * $0.065) + (18,000 * $0.046)
+        //      = $12.5 + $2,080 + $828 = $2,920.5/month
         let client = Client::anonymous();
         let result = client
             .aws()
@@ -513,15 +513,15 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result.price, 2911.5);
+        assert_eq!(result.price, 2920.5);
         assert_eq!(result.unit, "month");
     }
 
     #[tokio::test]
     async fn test_io2_fetch_monthly_all_tiers() {
         // 100 GB io2 with 100,000 IOPS (spans all 3 tiers)
-        // Cost = (100 * $0.125) + (32,000 * $0.065) + (32,000 * $0.0455) + (36,000 * $0.03185)
-        //      = $12.5 + $2,080 + $1,456 + $1,146.6 = $4,695.1/month
+        // Cost = (100 * $0.125) + (32,000 * $0.065) + (32,000 * $0.046) + (36,000 * $0.032)
+        //      = $12.5 + $2,080 + $1,472 + $1,152 = $4,716.5/month
         let client = Client::anonymous();
         let result = client
             .aws()
@@ -532,7 +532,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result.price, 4695.1);
+        assert_eq!(result.price, 4716.5);
         assert_eq!(result.unit, "month");
     }
 

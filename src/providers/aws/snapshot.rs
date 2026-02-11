@@ -1,107 +1,25 @@
 //! AWS EBS Snapshot pricing.
 
-use std::collections::HashMap;
-
-use crate::catalog::{aws_catalog, engine::PricingEngine};
-use crate::{Client, Result};
-
-use super::super::PriceResult;
+use crate::providers::macros::resource_builder;
 
 // ============================================================
 // Builder
 // ============================================================
 
-/// Builder for querying AWS EBS Snapshot prices.
-pub struct SnapshotBuilder {
-    client: Client,
-    region: Option<String>,
-    api_key: Option<String>,
-    override_default: Option<f64>,
-    size_gb: Option<u64>,
-}
-
-impl SnapshotBuilder {
-    /// Create a new snapshot builder
-    pub(crate) fn new(client: Client) -> Self {
-        Self {
-            client,
-            region: None,
-            api_key: None,
-            override_default: None,
-            size_gb: None,
-        }
-    }
-
-    /// Set the AWS region (e.g., "us-east-1")
-    pub fn region(mut self, region: impl Into<String>) -> Self {
-        self.region = Some(region.into());
-        self
-    }
-
-    /// Set the API key for this request.
-    pub fn api_key(mut self, key: impl Into<String>) -> Self {
-        self.api_key = Some(key.into());
-        self
-    }
-
-    /// Override the default fallback price.
-    pub fn override_default(mut self, price: f64) -> Self {
-        self.override_default = Some(price);
-        self
-    }
-
-    /// Set the snapshot size in GB (required for `fetch_monthly`).
-    pub fn size_gb(mut self, size: u64) -> Self {
-        self.size_gb = Some(size);
-        self
-    }
-
-    /// Fetch just the price value.
-    pub async fn fetch_price(self) -> Result<f64> {
-        self.fetch().await.map(|r| r.price)
-    }
-
-    /// Fetch the monthly cost (rate x size_gb).
-    ///
-    /// Requires `size_gb` to be set.
-    pub async fn fetch_monthly(self) -> Result<PriceResult> {
-        let size = self
-            .size_gb
-            .ok_or_else(|| crate::Error::validation("size_gb is required for fetch_monthly"))?;
-        let resource = aws_catalog().find("snapshot")?;
-        let region = self.region.as_deref().unwrap_or(&resource.default_region);
-        let mut params = HashMap::new();
-        params.insert("size_gb".to_string(), size);
-        PricingEngine::fetch_monthly(
-            &self.client,
-            resource,
-            "aws",
-            region,
-            self.api_key.as_deref(),
-            &params,
-        )
-        .await
-    }
-
-    /// Fetch the full price result including source information.
-    pub async fn fetch(self) -> Result<PriceResult> {
-        let resource = aws_catalog().find("snapshot")?;
-        let region = self.region.as_deref().unwrap_or(&resource.default_region);
-        PricingEngine::fetch(
-            &self.client,
-            resource,
-            "aws",
-            region,
-            self.api_key.as_deref(),
-            self.override_default,
-        )
-        .await
+resource_builder! {
+    /// Builder for querying AWS EBS Snapshot prices.
+    pub struct SnapshotBuilder {
+        catalog: aws_catalog,
+        resource: "snapshot",
+        vendor: "aws",
+        required param: size_gb(u64) => "size_gb is required for fetch_monthly",
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Client;
 
     #[tokio::test]
     async fn test_snapshot_builder_returns_default_without_api_key() {

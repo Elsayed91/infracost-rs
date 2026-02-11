@@ -36,7 +36,6 @@
 //! # }
 //! ```
 
-pub(crate) mod from_json;
 mod managed_disk;
 mod public_ip;
 mod snapshot;
@@ -134,41 +133,5 @@ impl AzureProvider {
     /// ```
     pub fn public_ip(self) -> PublicIpBuilder {
         PublicIpBuilder::new(self.client)
-    }
-
-    /// Parse an Azure managed disk JSON (from `az disk show --output json`) into a ManagedDiskBuilder.
-    pub fn managed_disk_from_json(
-        self,
-        json: &serde_json::Value,
-    ) -> crate::Result<ManagedDiskBuilder> {
-        let parsed = from_json::parse_managed_disk_json(json)?;
-        let mut builder = ManagedDiskBuilder::new(self.client, parsed.disk_type, parsed.size);
-        if let Some(r) = parsed.region {
-            builder = builder.region(r);
-        }
-        Ok(builder)
-    }
-
-    /// Parse an Azure snapshot JSON (from `az snapshot show --output json`) into a SnapshotBuilder.
-    pub fn snapshot_from_json(self, json: &serde_json::Value) -> crate::Result<SnapshotBuilder> {
-        let parsed = from_json::parse_snapshot_json(json)?;
-        let mut builder = SnapshotBuilder::new(self.client);
-        if let Some(r) = parsed.region {
-            builder = builder.region(r);
-        }
-        if let Some(gb) = parsed.size_gb {
-            builder = builder.size_gb(gb);
-        }
-        Ok(builder)
-    }
-
-    /// Parse an Azure public IP JSON (from `az network public-ip show --output json`) into a PublicIpBuilder.
-    pub fn public_ip_from_json(self, json: &serde_json::Value) -> crate::Result<PublicIpBuilder> {
-        let parsed = from_json::parse_public_ip_json(json)?;
-        let mut builder = PublicIpBuilder::new(self.client);
-        if let Some(r) = parsed.region {
-            builder = builder.region(r);
-        }
-        Ok(builder)
     }
 }

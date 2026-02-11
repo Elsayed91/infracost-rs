@@ -4,9 +4,9 @@
 
 ```
 resources/{vendor}/{resource}.yaml     <- pricing definition
-src/providers/{vendor}/{resource}.rs   <- async builder
+src/providers/{vendor}/{resource}.rs   <- async builder (use resource_builder! macro)
 src/providers/{vendor}/mod.rs          <- wire it in
-src/blocking/{vendor}.rs               <- sync builder mirror
+src/blocking/{vendor}.rs               <- blocking wrapper (use blocking_builder! macro)
 src/catalog/mod.rs                     <- register yaml
 tests/{vendor}_{resource}_regional.rs  <- integration tests
 ```
@@ -16,8 +16,8 @@ tests/{vendor}_{resource}_regional.rs  <- integration tests
 1. **Research** - use `irs` CLI to find query attributes that work across 7+ regions
 2. **YAML** - define the resource pricing
 3. **Catalog** - register the YAML in `src/catalog/mod.rs`
-4. **Builder** - create the Rust builder (copy closest existing one)
-5. **Wire** - add to `mod.rs` + blocking wrapper
+4. **Builder** - use `resource_builder!` macro (or hand-write for complex cases)
+5. **Wire** - add to `mod.rs` + blocking wrapper via `blocking_builder!`
 6. **Test** - unit tests in builder, integration tests in `tests/`
 
 ## 1. Research
@@ -109,13 +109,73 @@ include_str!("../../resources/gcp/your-resource.yaml"),
 
 ## 4. Builder
 
-Copy `src/providers/gcp/static_ip.rs` (simplest) or `disk.rs` (with params/variants).
+Most builders use `resource_builder!` macro from `src/providers/macros.rs`. Three variants:
 
-Key points:
-- Constructor is `pub(crate)` not `pub`
-- `fetch()` calls `PricingEngine::fetch()`
-- `fetch_monthly()` builds HashMap of params, calls `PricingEngine::fetch_monthly()`
-- Unit tests at the bottom
+**Simple (no params):**
+```rust
+use crate::providers::macros::resource_builder;
+
+resource_builder! {
+    /// Builder for querying GCP static IP prices.
+    pub struct StaticIpBuilder {
+        catalog: gcp_catalog,
+        resource: "static-ip",
+        vendor: "gcp",
+    }
+}
+```
+
+**Required param (must set for fetch_monthly):**
+```rust
+resource_builder! {
+    /// Builder for querying AWS Snapshot prices.
+    pub struct SnapshotBuilder {
+        catalog: aws_catalog,
+        resource: "snapshot",
+        vendor: "aws",
+        required param: size_gb(u64) => "size_gb is required for fetch_monthly",
+    }
+}
+```
+
+**Optional param (defaults to 0):**
+```rust
+resource_builder! {
+    /// Builder for querying AWS NAT Gateway prices.
+    pub struct NatGatewayBuilder {
+        catalog: aws_catalog,
+        resource: "nat-gateway",
+        vendor: "aws",
+        optional param: data_processed_gb(u64),
+    }
+}
+```
+
+The macro generates: `new(client: Client)`, `region()`, `api_key()`, `override_default()`, `fetch()`, `fetch_price()`, `fetch_monthly()`.
+
+Builders own a `Client` (no lifetimes). `Client` is `Arc<ClientInner>` so cloning is O(1).
+
+**Hand-write** for complex cases (multi-param, tiered, conditional logic). See `disk.rs`, `ebs.rs`, `backend_service.rs`, `managed_disk.rs`.
+
+Add unit tests below the macro/struct:
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Client;
+
+    #[tokio::test]
+    async fn test_{resource}_returns_default_without_api_key() {
+        let client = Client::anonymous();
+        let result = client.{vendor}().{resource}()
+            .region("{default_region}")
+            .fetch().await.unwrap();
+        assert!(result.is_from_default());
+        assert_eq!(result.price, {DEFAULT_PRICE});
+        assert_eq!(result.unit, "{UNIT}");
+    }
+}
+```
 
 ## 5. Wire
 
@@ -123,10 +183,35 @@ Key points:
 ```rust
 mod your_resource;
 pub use your_resource::YourResourceBuilder;
-// add method to provider impl block
+
+// add method to provider impl block - takes owned self, no lifetimes
+pub fn your_resource(self) -> YourResourceBuilder {
+    YourResourceBuilder::new(self.client)
+}
 ```
 
-`src/blocking/{vendor}.rs`: mirror the async builder using `self.runtime.block_on(...)`.
+`src/blocking/{vendor}.rs` - use `blocking_builder!` macro:
+```rust
+blocking_builder! {
+    /// Blocking builder for querying {Vendor} {Resource} prices.
+    pub struct Blocking{Vendor}{Resource}Builder wraps crate::providers::{vendor}::{Resource}Builder {
+        // list extra setter methods here (beyond region/api_key/override_default):
+        fn size_gb(u64);
+    }
+}
+```
+
+The macro wraps the async builder directly: `{ inner: AsyncBuilder, runtime: Arc<Runtime> }`. It generates `region()`, `api_key()`, `override_default()`, `fetch()`, `fetch_price()`, `fetch_monthly()` plus any listed extra setters.
+
+Add the provider method:
+```rust
+pub fn your_resource(self) -> Blocking{Vendor}{Resource}Builder {
+    Blocking{Vendor}{Resource}Builder {
+        inner: self.client.{vendor}().your_resource(),
+        runtime: self.runtime,
+    }
+}
+```
 
 ## 6. Test
 
@@ -143,7 +228,7 @@ INFRACOST_API_KEY=xxx cargo test --test your_test -- --ignored  # integration
 - [ ] Catalog test passes
 - [ ] Unit tests pass without API key
 - [ ] Integration tests pass with API key
-- [ ] Blocking wrapper exists
+- [ ] Blocking wrapper exists (via `blocking_builder!`)
 - [ ] `cargo clippy --all-features` clean
 
 AI-automated workflow: `/add-resource` skill (`.claude/skills/add-resource/SKILL.md`)

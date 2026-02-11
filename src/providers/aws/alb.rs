@@ -26,138 +26,29 @@
 //! # }
 //! ```
 
-use std::collections::HashMap;
-
-use crate::catalog::{aws_catalog, engine::PricingEngine};
-use crate::{Client, Result};
-
-use super::super::PriceResult;
+use crate::providers::macros::resource_builder;
 
 // ============================================================
 // Builder
 // ============================================================
 
-/// Builder for querying AWS Application Load Balancer prices.
-///
-/// Returns the hourly rate for ALB. Additional LCU (Load Balancer Capacity Units)
-/// charges apply based on usage.
-pub struct AlbBuilder {
-    client: Client,
-    region: Option<String>,
-    api_key: Option<String>,
-    override_default: Option<f64>,
-    // LCU usage for monthly cost calculation
-    lcu_hours: Option<u64>,
-}
-
-impl AlbBuilder {
-    /// Create a new ALB builder
-    pub(crate) fn new(client: Client) -> Self {
-        Self {
-            client,
-            region: None,
-            api_key: None,
-            override_default: None,
-            lcu_hours: None,
-        }
-    }
-
-    /// Set the AWS region (e.g., "us-east-1")
-    pub fn region(mut self, region: impl Into<String>) -> Self {
-        self.region = Some(region.into());
-        self
-    }
-
-    /// Set the API key for this request.
-    pub fn api_key(mut self, key: impl Into<String>) -> Self {
-        self.api_key = Some(key.into());
-        self
-    }
-
-    /// Override the default fallback price.
-    pub fn override_default(mut self, price: f64) -> Self {
-        self.override_default = Some(price);
-        self
-    }
-
-    /// Set the LCU-hours per month (required for `fetch_monthly`).
+resource_builder! {
+    /// Builder for querying AWS Application Load Balancer prices.
     ///
-    /// LCU (Load Balancer Capacity Unit) is a dimension that represents the resources
-    /// needed to process your traffic. ALB pricing consists of:
-    /// - Hourly charge (~$0.0225/hour = ~$16.43/month for 730 hours)
-    /// - LCU charge (~$0.008/LCU-hour)
-    ///
-    /// The number of LCUs you need depends on your traffic patterns and is calculated
-    /// based on the maximum of:
-    /// - New connections per second
-    /// - Active connections per minute
-    /// - Processed bytes
-    /// - Rule evaluations
-    pub fn lcu_hours(mut self, lcu_hours: u64) -> Self {
-        self.lcu_hours = Some(lcu_hours);
-        self
-    }
-
-    /// Fetch just the price value.
-    pub async fn fetch_price(self) -> Result<f64> {
-        self.fetch().await.map(|r| r.price)
-    }
-
-    /// Fetch the full price result including source information.
-    pub async fn fetch(self) -> Result<PriceResult> {
-        let resource = aws_catalog().find("alb")?;
-        let region = self.region.as_deref().unwrap_or(&resource.default_region);
-        PricingEngine::fetch(
-            &self.client,
-            resource,
-            "aws",
-            region,
-            self.api_key.as_deref(),
-            self.override_default,
-        )
-        .await
-    }
-
-    /// Fetch total monthly cost based on hourly rate and LCU usage.
-    ///
-    /// Calculates: (hourly_rate * 730 hours) + (lcu_rate * lcu_hours)
-    ///
-    /// If `lcu_hours()` is not set, only the hourly cost is calculated.
-    ///
-    /// # Example
-    /// ```rust,no_run
-    /// # use infracost_rs::Client;
-    /// # async fn example() -> infracost_rs::Result<()> {
-    /// let client = Client::new("api-key");
-    /// let cost = client.aws().alb()
-    ///     .lcu_hours(10000)
-    ///     .fetch_monthly().await?;
-    /// // Cost = ($0.0225 * 730) + ($0.008 * 10000) = $16.43 + $80 = $96.43/month
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn fetch_monthly(self) -> Result<PriceResult> {
-        let resource = aws_catalog().find("alb")?;
-        let region = self.region.as_deref().unwrap_or(&resource.default_region);
-        let mut params = HashMap::new();
-        if let Some(lcu) = self.lcu_hours {
-            params.insert("lcu_hours".to_string(), lcu);
-        }
-        PricingEngine::fetch_monthly(
-            &self.client,
-            resource,
-            "aws",
-            region,
-            self.api_key.as_deref(),
-            &params,
-        )
-        .await
+    /// Returns the hourly rate for ALB. Additional LCU (Load Balancer Capacity Units)
+    /// charges apply based on usage.
+    pub struct AlbBuilder {
+        catalog: aws_catalog,
+        resource: "alb",
+        vendor: "aws",
+        optional param: lcu_hours(u64),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Client;
 
     #[tokio::test]
     async fn test_alb_builder_returns_default_without_api_key() {
