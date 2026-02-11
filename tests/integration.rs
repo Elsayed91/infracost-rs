@@ -9,7 +9,7 @@
 
 use infracost_rs::providers::aws::EbsType;
 use infracost_rs::providers::azure::{ManagedDiskSize, ManagedDiskType};
-use infracost_rs::providers::gcp::DiskType;
+use infracost_rs::providers::gcp::{BackendServiceTier, DiskType};
 use infracost_rs::{Client, ProductFilter};
 
 fn get_client() -> Option<Client> {
@@ -292,6 +292,42 @@ async fn test_gcp_forwarding_rule_provider() {
     assert!(result.is_from_api(), "Should get price from API");
     assert!(result.price > 0.0, "Price should be positive");
     assert_eq!(result.unit, "hour");
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_gcp_backend_service_premium_provider() {
+    let client = get_client().expect("INFRACOST_API_KEY must be set");
+
+    let result = client
+        .gcp()
+        .backend_service(BackendServiceTier::Premium)
+        .region("us-central1")
+        .fetch()
+        .await
+        .expect("Query should succeed");
+
+    assert!(result.is_from_api(), "Should get price from API");
+    assert!(result.price > 0.0, "Price should be positive");
+    assert_eq!(result.unit, "GiB");
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_gcp_backend_service_standard_provider() {
+    let client = get_client().expect("INFRACOST_API_KEY must be set");
+
+    let result = client
+        .gcp()
+        .backend_service(BackendServiceTier::Standard)
+        .region("us-central1")
+        .fetch()
+        .await
+        .expect("Query should succeed");
+
+    assert!(result.is_from_api(), "Should get price from API");
+    assert!(result.price > 0.0, "Price should be positive");
+    assert_eq!(result.unit, "GiB");
 }
 
 // ============================================================

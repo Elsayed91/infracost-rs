@@ -35,6 +35,11 @@ pub(crate) struct ParsedGcpNatGateway {
     pub region: Option<String>,
 }
 
+pub(crate) struct ParsedGcpBackendService {
+    pub region: Option<String>,
+    pub tier: super::backend_service::BackendServiceTier,
+}
+
 // ============================================================
 // Parse Functions
 // ============================================================
@@ -121,6 +126,37 @@ pub(crate) fn parse_nat_gateway_json(json: &Value) -> Result<ParsedGcpNatGateway
         });
 
     Ok(ParsedGcpNatGateway { region })
+}
+
+/// Parse a GCP backend service JSON (from `gcloud compute backend-services describe --format=json`).
+///
+/// Determines the network tier from the `loadBalancingScheme` field:
+/// - `EXTERNAL_MANAGED` or `INTERNAL_MANAGED` -> Premium tier (global LB)
+/// - `EXTERNAL` with `protocol: HTTP/HTTPS` -> Standard tier (regional LB)
+/// - Default: Premium tier
+///
+/// Region is extracted from the `region` field or `selfLink`.
+pub(crate) fn parse_backend_service_json(json: &Value) -> Result<ParsedGcpBackendService> {
+    use super::backend_service::BackendServiceTier;
+
+    let region = json["region"]
+        .as_str()
+        .map(|r| last_path_segment(r).to_string())
+        .or_else(|| {
+            json["selfLink"]
+                .as_str()
+                .and_then(gcp_region_from_link)
+                .map(|s| s.to_string())
+        });
+
+    // Determine tier from loadBalancingScheme
+    let scheme = json["loadBalancingScheme"].as_str().unwrap_or("");
+    let tier = match scheme {
+        "EXTERNAL" => BackendServiceTier::Standard,
+        _ => BackendServiceTier::Premium, // EXTERNAL_MANAGED, INTERNAL_MANAGED, etc.
+    };
+
+    Ok(ParsedGcpBackendService { region, tier })
 }
 
 #[cfg(test)]
@@ -339,5 +375,77 @@ mod tests {
         let json = json!({});
         let parsed = parse_nat_gateway_json(&json).unwrap();
         assert_eq!(parsed.region, None);
+    }
+
+    // ============================================================
+    // parse_backend_service_json
+    // ============================================================
+
+    #[test]
+    fn test_parse_backend_service_json_premium_external_managed() {
+        let json = json!({
+            "loadBalancingScheme": "EXTERNAL_MANAGED",
+            "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/backendServices/my-bs"
+        });
+        let parsed = parse_backend_service_json(&json).unwrap();
+        assert_eq!(
+            parsed.tier,
+            super::super::backend_service::BackendServiceTier::Premium
+        );
+        // Global backend services don't have a region in selfLink
+        assert_eq!(parsed.region, None);
+    }
+
+    #[test]
+    fn test_parse_backend_service_json_standard_external() {
+        let json = json!({
+            "loadBalancingScheme": "EXTERNAL",
+            "region": "projects/my-project/regions/us-central1"
+        });
+        let parsed = parse_backend_service_json(&json).unwrap();
+        assert_eq!(
+            parsed.tier,
+            super::super::backend_service::BackendServiceTier::Standard
+        );
+        assert_eq!(parsed.region.as_deref(), Some("us-central1"));
+    }
+
+    #[test]
+    fn test_parse_backend_service_json_default_tier() {
+        let json = json!({});
+        let parsed = parse_backend_service_json(&json).unwrap();
+        assert_eq!(
+            parsed.tier,
+            super::super::backend_service::BackendServiceTier::Premium
+        );
+        assert_eq!(parsed.region, None);
+    }
+
+    #[test]
+    fn test_parse_backend_service_json_region_from_self_link() {
+        let json = json!({
+            "loadBalancingScheme": "EXTERNAL",
+            "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/regions/europe-west1/backendServices/my-bs"
+        });
+        let parsed = parse_backend_service_json(&json).unwrap();
+        assert_eq!(
+            parsed.tier,
+            super::super::backend_service::BackendServiceTier::Standard
+        );
+        assert_eq!(parsed.region.as_deref(), Some("europe-west1"));
+    }
+
+    #[test]
+    fn test_parse_backend_service_json_internal_managed() {
+        let json = json!({
+            "loadBalancingScheme": "INTERNAL_MANAGED",
+            "region": "projects/my-project/regions/us-east1"
+        });
+        let parsed = parse_backend_service_json(&json).unwrap();
+        assert_eq!(
+            parsed.tier,
+            super::super::backend_service::BackendServiceTier::Premium
+        );
+        assert_eq!(parsed.region.as_deref(), Some("us-east1"));
     }
 }

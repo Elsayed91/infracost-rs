@@ -19,6 +19,7 @@
 //! # }
 //! ```
 
+mod backend_service;
 mod disk;
 mod forwarding_rule;
 pub(crate) mod from_json;
@@ -26,6 +27,7 @@ mod nat_gateway;
 mod snapshot;
 mod static_ip;
 
+pub use backend_service::{BackendServiceBuilder, BackendServiceTier};
 pub use disk::{DiskBuilder, DiskType};
 pub use forwarding_rule::ForwardingRuleBuilder;
 pub use nat_gateway::NatGatewayBuilder;
@@ -98,6 +100,33 @@ impl<'a> GcpProvider<'a> {
         ForwardingRuleBuilder::new(self.client)
     }
 
+    /// Query GCP Backend Service pricing.
+    ///
+    /// Backend services handle data processing for load balancers.
+    /// - Premium tier (global): $0.008/GiB data processing
+    /// - Standard tier (regional): $0.008/GiB data processing
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use infracost_rs::Client;
+    /// use infracost_rs::providers::gcp::BackendServiceTier;
+    ///
+    /// # async fn example() -> Result<(), infracost_rs::Error> {
+    /// let client = Client::anonymous();
+    /// let price = client
+    ///     .gcp()
+    ///     .backend_service(BackendServiceTier::Premium)
+    ///     .region("us-central1")
+    ///     .fetch_price()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn backend_service(self, tier: impl Into<BackendServiceTier>) -> BackendServiceBuilder<'a> {
+        BackendServiceBuilder::new(self.client, tier.into())
+    }
+
     /// Parse a GCP disk JSON (from `gcloud compute disks describe --format=json`) into a DiskBuilder.
     pub fn disk_from_json(self, json: &serde_json::Value) -> Result<DiskBuilder<'a>> {
         let parsed = from_json::parse_disk_json(json)?;
@@ -147,6 +176,19 @@ impl<'a> GcpProvider<'a> {
     pub fn nat_gateway_from_json(self, json: &serde_json::Value) -> Result<NatGatewayBuilder<'a>> {
         let parsed = from_json::parse_nat_gateway_json(json)?;
         let mut builder = NatGatewayBuilder::new(self.client);
+        if let Some(r) = parsed.region {
+            builder = builder.region(r);
+        }
+        Ok(builder)
+    }
+
+    /// Parse a GCP backend service JSON (from `gcloud compute backend-services describe --format=json`) into a BackendServiceBuilder.
+    pub fn backend_service_from_json(
+        self,
+        json: &serde_json::Value,
+    ) -> Result<BackendServiceBuilder<'a>> {
+        let parsed = from_json::parse_backend_service_json(json)?;
+        let mut builder = BackendServiceBuilder::new(self.client, parsed.tier);
         if let Some(r) = parsed.region {
             builder = builder.region(r);
         }

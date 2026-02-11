@@ -1,0 +1,69 @@
+- name: backend-service
+  display_name: "Backend Service (Premium Tier)"
+  default_region: us-central1
+  parameters:
+    - { name: data_processed_gb, required_for_monthly: true }
+  cost_components:
+    - name: data_processing
+      is_primary: true
+      unit: GiB
+      default_price: 0.008
+      query:
+        service: Networking
+        product_family: Network
+        attributes:
+          - { key: resourceGroup, value: LoadBalancing }
+      post_filter:
+        description_contains:
+          - "Global External Application LB"
+          - "Inbound Data Processing"
+      pricing_model:
+        type: linear
+        quantity_param: data_processed_gb
+
+- name: backend-service/premium
+  display_name: "Backend Service (Premium Tier)"
+  default_region: us-central1
+  parameters:
+    - { name: data_processed_gb, required_for_monthly: true }
+  cost_components:
+    - name: data_processing
+      is_primary: true
+      unit: GiB
+      default_price: 0.008
+      query:
+        service: Networking
+        product_family: Network
+        attributes:
+          - { key: resourceGroup, value: LoadBalancing }
+      post_filter:
+        description_contains:
+          - "Global External Application LB"
+          - "Inbound Data Processing"
+      pricing_model:
+        type: linear
+        quantity_param: data_processed_gb
+
+- name: backend-service/standard
+  display_name: "Backend Service (Standard Tier)"
+  default_region: us-central1
+  parameters:
+    - { name: data_processed_gb, required_for_monthly: true }
+  cost_components:
+    - name: data_processing
+      is_primary: true
+      unit: GiB
+      default_price: 0.008
+      query:
+        service: Networking
+        product_family: Network
+        attributes:
+          - { key: resourceGroup, value: LoadBalancing }
+      post_filter:
+        description_contains:
+          - "Regional External"
+          - "Application Load Balancer"
+          - "Inbound Data Processing"
+      pricing_model:
+        type: linear
+        quantity_param: data_processed_gb

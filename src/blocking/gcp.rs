@@ -25,7 +25,7 @@
 
 use crate::error::Result;
 use crate::providers::PriceResult;
-use crate::providers::gcp::DiskType;
+use crate::providers::gcp::{BackendServiceTier, DiskType};
 use std::sync::Arc;
 
 // ============================================================
@@ -193,6 +193,46 @@ impl BlockingGcpProvider {
             override_default: None,
             data_processed_gb: None,
         }
+    }
+
+    /// Query GCP Backend Service pricing.
+    ///
+    /// Backend services handle data processing for load balancers.
+    /// - Premium tier (global): $0.008/GiB data processing
+    /// - Standard tier (regional): $0.008/GiB data processing
+    /// - Optionally include forwarding rule charges ($0.025/hour per rule)
+    pub fn backend_service(
+        self,
+        tier: impl Into<BackendServiceTier>,
+    ) -> BlockingGcpBackendServiceBuilder {
+        BlockingGcpBackendServiceBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            tier: tier.into(),
+            region: None,
+            api_key: None,
+            override_default: None,
+            data_processed_gb: None,
+            forwarding_rules: None,
+        }
+    }
+
+    /// Parse a GCP backend service JSON (from `gcloud compute backend-services describe --format=json`) into a blocking BackendServiceBuilder.
+    pub fn backend_service_from_json(
+        self,
+        json: &serde_json::Value,
+    ) -> crate::Result<BlockingGcpBackendServiceBuilder> {
+        let parsed = crate::providers::gcp::from_json::parse_backend_service_json(json)?;
+        Ok(BlockingGcpBackendServiceBuilder {
+            client: self.client,
+            runtime: self.runtime,
+            tier: parsed.tier,
+            region: parsed.region,
+            api_key: None,
+            override_default: None,
+            data_processed_gb: None,
+            forwarding_rules: None,
+        })
     }
 }
 
@@ -647,6 +687,104 @@ impl BlockingGcpForwardingRuleBuilder {
 }
 
 // ============================================================
+// Backend Service Builder
+// ============================================================
+
+/// Blocking builder for querying GCP Backend Service prices.
+pub struct BlockingGcpBackendServiceBuilder {
+    client: crate::Client,
+    runtime: Arc<tokio::runtime::Runtime>,
+    tier: BackendServiceTier,
+    region: Option<String>,
+    api_key: Option<String>,
+    override_default: Option<f64>,
+    data_processed_gb: Option<u64>,
+    forwarding_rules: Option<u64>,
+}
+
+impl BlockingGcpBackendServiceBuilder {
+    /// Set the GCP region (e.g., "us-central1")
+    pub fn region(mut self, region: impl Into<String>) -> Self {
+        self.region = Some(region.into());
+        self
+    }
+
+    /// Set the API key for this request.
+    pub fn api_key(mut self, key: impl Into<String>) -> Self {
+        self.api_key = Some(key.into());
+        self
+    }
+
+    /// Override the default fallback price.
+    pub fn override_default(mut self, price: f64) -> Self {
+        self.override_default = Some(price);
+        self
+    }
+
+    /// Set the amount of data processed in GB per month (required for `fetch_monthly`).
+    pub fn data_processed_gb(mut self, gb: u64) -> Self {
+        self.data_processed_gb = Some(gb);
+        self
+    }
+
+    /// Include forwarding rule hourly charges in `fetch_monthly`.
+    ///
+    /// GCP load balancers require at least one forwarding rule ($0.025/hour).
+    /// This adds the forwarding rule cost to the monthly total.
+    pub fn forwarding_rules(mut self, count: u64) -> Self {
+        self.forwarding_rules = Some(count);
+        self
+    }
+
+    /// Fetch the full price result including source information.
+    /// Returns the per-GiB data processing rate.
+    pub fn fetch(self) -> Result<PriceResult> {
+        let mut b = self.client.gcp().backend_service(self.tier);
+        if let Some(v) = self.region {
+            b = b.region(v);
+        }
+        if let Some(v) = self.api_key {
+            b = b.api_key(v);
+        }
+        if let Some(v) = self.override_default {
+            b = b.override_default(v);
+        }
+        if let Some(v) = self.data_processed_gb {
+            b = b.data_processed_gb(v);
+        }
+        self.runtime.block_on(b.fetch())
+    }
+
+    /// Fetch just the price value.
+    pub fn fetch_price(self) -> Result<f64> {
+        self.fetch().map(|r| r.price)
+    }
+
+    /// Fetch total monthly cost based on data processing and forwarding rules.
+    ///
+    /// Calculates: (forwarding_rule_hourly * 730 * count) + (data_rate * gb_processed)
+    pub fn fetch_monthly(self) -> Result<PriceResult> {
+        let mut b = self.client.gcp().backend_service(self.tier);
+        if let Some(v) = self.region {
+            b = b.region(v);
+        }
+        if let Some(v) = self.api_key {
+            b = b.api_key(v);
+        }
+        if let Some(v) = self.override_default {
+            b = b.override_default(v);
+        }
+        if let Some(v) = self.data_processed_gb {
+            b = b.data_processed_gb(v);
+        }
+        if let Some(v) = self.forwarding_rules {
+            b = b.forwarding_rules(v);
+        }
+        self.runtime.block_on(b.fetch_monthly())
+    }
+}
+
+// ============================================================
 // Tests
 // ============================================================
 
@@ -991,5 +1129,147 @@ mod tests {
         // Cost = $0.025 * 730 = $18.25/month (no data processing)
         assert_eq!(result.price, 18.25);
         assert_eq!(result.unit, "month");
+    }
+
+    // ============================================================
+    // Backend Service Tests
+    // ============================================================
+
+    #[test]
+    fn test_blocking_gcp_backend_service_premium_default() {
+        let client = Client::anonymous();
+        let result = client
+            .gcp()
+            .backend_service(BackendServiceTier::Premium)
+            .region("us-central1")
+            .fetch()
+            .unwrap();
+
+        assert!(result.is_from_default());
+        assert_eq!(result.price, 0.008);
+        assert_eq!(result.unit, "GiB");
+    }
+
+    #[test]
+    fn test_blocking_gcp_backend_service_standard_default() {
+        let client = Client::anonymous();
+        let result = client
+            .gcp()
+            .backend_service(BackendServiceTier::Standard)
+            .region("us-central1")
+            .fetch()
+            .unwrap();
+
+        assert!(result.is_from_default());
+        assert_eq!(result.price, 0.008);
+        assert_eq!(result.unit, "GiB");
+    }
+
+    #[test]
+    fn test_blocking_gcp_backend_service_premium_fetch_price() {
+        let client = Client::anonymous();
+        let price = client
+            .gcp()
+            .backend_service(BackendServiceTier::Premium)
+            .region("us-central1")
+            .fetch_price()
+            .unwrap();
+
+        assert_eq!(price, 0.008);
+    }
+
+    #[test]
+    fn test_blocking_gcp_backend_service_premium_fetch_monthly() {
+        let client = Client::anonymous();
+        let result = client
+            .gcp()
+            .backend_service(BackendServiceTier::Premium)
+            .region("us-central1")
+            .data_processed_gb(1000)
+            .fetch_monthly()
+            .unwrap();
+
+        // Cost = $0.008 * 1000 = $8.00/month
+        assert_eq!(result.price, 8.0);
+        assert_eq!(result.unit, "month");
+    }
+
+    #[test]
+    fn test_blocking_gcp_backend_service_standard_fetch_monthly() {
+        let client = Client::anonymous();
+        let result = client
+            .gcp()
+            .backend_service(BackendServiceTier::Standard)
+            .region("us-central1")
+            .data_processed_gb(1000)
+            .fetch_monthly()
+            .unwrap();
+
+        // Cost = $0.008 * 1000 = $8.00/month
+        assert_eq!(result.price, 8.0);
+        assert_eq!(result.unit, "month");
+    }
+
+    #[test]
+    fn test_blocking_gcp_backend_service_fetch_monthly_no_data() {
+        let client = Client::anonymous();
+        let result = client
+            .gcp()
+            .backend_service(BackendServiceTier::Premium)
+            .region("us-central1")
+            .fetch_monthly()
+            .unwrap();
+
+        // Cost = $0.008 * 0 = $0.00/month
+        assert_eq!(result.price, 0.0);
+        assert_eq!(result.unit, "month");
+    }
+
+    #[test]
+    fn test_blocking_gcp_backend_service_with_forwarding_rule() {
+        let client = Client::anonymous();
+        let result = client
+            .gcp()
+            .backend_service(BackendServiceTier::Premium)
+            .region("us-central1")
+            .forwarding_rules(1)
+            .fetch_monthly()
+            .unwrap();
+
+        // Cost = ($0.025 * 730) + ($0.008 * 0) = $18.25/month
+        assert_eq!(result.price, 18.25);
+        assert_eq!(result.unit, "month");
+    }
+
+    #[test]
+    fn test_blocking_gcp_backend_service_with_forwarding_rule_and_data() {
+        let client = Client::anonymous();
+        let result = client
+            .gcp()
+            .backend_service(BackendServiceTier::Premium)
+            .region("us-central1")
+            .forwarding_rules(1)
+            .data_processed_gb(1000)
+            .fetch_monthly()
+            .unwrap();
+
+        // Cost = ($0.025 * 730) + ($0.008 * 1000) = $18.25 + $8.00 = $26.25/month
+        assert_eq!(result.price, 26.25);
+        assert_eq!(result.unit, "month");
+    }
+
+    #[test]
+    fn test_blocking_gcp_backend_service_override_default() {
+        let client = Client::anonymous();
+        let result = client
+            .gcp()
+            .backend_service(BackendServiceTier::Premium)
+            .region("us-central1")
+            .override_default(0.015)
+            .fetch()
+            .unwrap();
+
+        assert!(result.is_from_default());
+        assert_eq!(result.price, 0.015);
     }
 }

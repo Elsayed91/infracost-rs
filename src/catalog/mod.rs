@@ -23,6 +23,7 @@ pub static GCP_CATALOG: LazyLock<ResourceCatalog> = LazyLock::new(|| {
             include_str!("../../resources/gcp/static-ip.yaml"),
             include_str!("../../resources/gcp/nat-gateway.yaml"),
             include_str!("../../resources/gcp/forwarding-rule.yaml"),
+            include_str!("../../resources/gcp/backend-service.yaml"),
         ],
     )
 });
@@ -83,6 +84,9 @@ mod tests {
         assert!(cat.find("snapshot").is_ok());
         assert!(cat.find("nat-gateway").is_ok());
         assert!(cat.find("forwarding-rule").is_ok());
+        assert!(cat.find("backend-service").is_ok());
+        assert!(cat.find("backend-service/premium").is_ok());
+        assert!(cat.find("backend-service/standard").is_ok());
     }
 
     #[test]
@@ -128,6 +132,29 @@ mod tests {
         let storage = gp3.cost_components.iter().find(|c| c.is_primary).unwrap();
         assert_eq!(storage.default_price, 0.08);
         assert_eq!(storage.unit, "GB-month");
+    }
+
+    #[test]
+    fn test_gcp_backend_service_defaults_match() {
+        let cat = gcp_catalog();
+
+        let premium = cat.find("backend-service/premium").unwrap();
+        let data_proc = premium
+            .cost_components
+            .iter()
+            .find(|c| c.is_primary)
+            .unwrap();
+        assert_eq!(data_proc.default_price, 0.008);
+        assert_eq!(data_proc.unit, "GiB");
+
+        let standard = cat.find("backend-service/standard").unwrap();
+        let data_proc = standard
+            .cost_components
+            .iter()
+            .find(|c| c.is_primary)
+            .unwrap();
+        assert_eq!(data_proc.default_price, 0.008);
+        assert_eq!(data_proc.unit, "GiB");
     }
 
     #[test]
