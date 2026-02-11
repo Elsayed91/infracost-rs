@@ -3,7 +3,7 @@
 use serde_json::Value;
 
 use super::super::json_utils::{
-    gcp_region_from_link, gcp_zone_to_region, last_path_segment, parse_u64,
+    gcp_region_from_link, gcp_zone_to_region, last_path_segment, normalize_gcp_location, parse_u64,
 };
 use super::disk::DiskType;
 use crate::Result;
@@ -82,7 +82,7 @@ pub(crate) fn parse_snapshot_json(json: &Value) -> Result<ParsedGcpSnapshot> {
         .as_array()
         .and_then(|a| a.first())
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
+        .map(|s| normalize_gcp_location(s).to_string())
         .or_else(|| {
             json["selfLink"]
                 .as_str()
@@ -244,6 +244,35 @@ mod tests {
         let parsed = parse_snapshot_json(&json).unwrap();
         assert_eq!(parsed.region.as_deref(), Some("europe-west1"));
         assert_eq!(parsed.size_gb, None);
+    }
+
+    #[test]
+    fn test_parse_snapshot_json_multi_region_eu() {
+        let json = json!({
+            "storageBytes": "5368709120",
+            "storageLocations": ["eu"]
+        });
+        let parsed = parse_snapshot_json(&json).unwrap();
+        assert_eq!(parsed.region.as_deref(), Some("europe-west1"));
+        assert_eq!(parsed.size_gb, Some(5));
+    }
+
+    #[test]
+    fn test_parse_snapshot_json_multi_region_us() {
+        let json = json!({
+            "storageLocations": ["us"]
+        });
+        let parsed = parse_snapshot_json(&json).unwrap();
+        assert_eq!(parsed.region.as_deref(), Some("us-central1"));
+    }
+
+    #[test]
+    fn test_parse_snapshot_json_multi_region_asia() {
+        let json = json!({
+            "storageLocations": ["asia"]
+        });
+        let parsed = parse_snapshot_json(&json).unwrap();
+        assert_eq!(parsed.region.as_deref(), Some("asia-east1"));
     }
 
     #[test]

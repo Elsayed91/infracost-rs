@@ -76,6 +76,15 @@ impl PricingEngine {
             PriceSource::Default
         };
 
+        tracing::debug!(
+            target: "infracost",
+            resource = %resource.name,
+            region = %region,
+            total_monthly = total,
+            source = ?source,
+            "Monthly cost calculated"
+        );
+
         Ok(PriceResult {
             price: total,
             unit: "month".to_string(),
@@ -97,6 +106,14 @@ impl PricingEngine {
         // Check if we have an API key
         let has_key = api_key.is_some() || client.has_api_key();
         if !has_key && !client.error_on_fallback() {
+            tracing::debug!(
+                target: "infracost",
+                component = %component.name,
+                region = %region,
+                price = default_price,
+                unit = %unit,
+                "No API key — using default price"
+            );
             return Ok(PriceResult::from_default(default_price, unit));
         }
 
@@ -137,12 +154,38 @@ impl PricingEngine {
                     }
                 }
 
+                tracing::debug!(
+                    target: "infracost",
+                    component = %component.name,
+                    region = %region,
+                    price = price,
+                    unit = %unit,
+                    products_found = products.len(),
+                    "API price resolved"
+                );
                 Ok(PriceResult::from_api(price, unit))
             }
             Ok(_) if !client.error_on_fallback() => {
+                tracing::debug!(
+                    target: "infracost",
+                    component = %component.name,
+                    region = %region,
+                    price = default_price,
+                    unit = %unit,
+                    "API returned no products — using default price"
+                );
                 Ok(PriceResult::from_default(default_price, unit))
             }
-            Err(_) if !client.error_on_fallback() => {
+            Err(ref e) if !client.error_on_fallback() => {
+                tracing::debug!(
+                    target: "infracost",
+                    component = %component.name,
+                    region = %region,
+                    price = default_price,
+                    unit = %unit,
+                    error = %e,
+                    "API error — using default price"
+                );
                 Ok(PriceResult::from_default(default_price, unit))
             }
             Err(e) => Err(e),
@@ -393,6 +436,15 @@ impl PricingEngine {
         } else {
             PriceSource::Default
         };
+
+        tracing::debug!(
+            target: "infracost",
+            resource = %resource.name,
+            region = %region,
+            total_monthly = total,
+            source = ?source,
+            "Monthly cost calculated (tiered)"
+        );
 
         Ok(PriceResult {
             price: total,

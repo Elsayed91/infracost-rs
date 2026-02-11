@@ -36,6 +36,28 @@ pub fn gcp_region_from_link(link: &str) -> Option<&str> {
     Some(rest.split('/').next().unwrap_or(rest))
 }
 
+/// Normalize a GCP location to a region suitable for pricing queries.
+///
+/// GCP resources can have multi-region storage locations like `"eu"`, `"us"`, `"asia"`
+/// which the pricing API doesn't recognize. This maps them to representative regions.
+/// Dual-region locations (`"nam4"`, `"eur4"`) are also mapped.
+/// Full region names pass through unchanged.
+///
+/// `"eu"` -> `"europe-west1"`
+/// `"us"` -> `"us-central1"`
+/// `"asia"` -> `"asia-east1"`
+/// `"europe-west1"` -> `"europe-west1"` (unchanged)
+pub fn normalize_gcp_location(location: &str) -> &str {
+    match location {
+        "us" => "us-central1",
+        "eu" => "europe-west1",
+        "asia" => "asia-east1",
+        "nam4" => "us-central1",
+        "eur4" => "europe-west4",
+        other => other,
+    }
+}
+
 /// Convert an AWS availability zone to a region.
 ///
 /// `"us-east-1a"` -> `"us-east-1"`
@@ -161,6 +183,30 @@ mod tests {
             gcp_region_from_link("projects/my-project/zones/us-central1-a"),
             None
         );
+    }
+
+    // ============================================================
+    // normalize_gcp_location
+    // ============================================================
+
+    #[test]
+    fn test_normalize_gcp_location_multi_regions() {
+        assert_eq!(normalize_gcp_location("us"), "us-central1");
+        assert_eq!(normalize_gcp_location("eu"), "europe-west1");
+        assert_eq!(normalize_gcp_location("asia"), "asia-east1");
+    }
+
+    #[test]
+    fn test_normalize_gcp_location_dual_regions() {
+        assert_eq!(normalize_gcp_location("nam4"), "us-central1");
+        assert_eq!(normalize_gcp_location("eur4"), "europe-west4");
+    }
+
+    #[test]
+    fn test_normalize_gcp_location_passthrough() {
+        assert_eq!(normalize_gcp_location("europe-west1"), "europe-west1");
+        assert_eq!(normalize_gcp_location("us-central1"), "us-central1");
+        assert_eq!(normalize_gcp_location("asia-east1"), "asia-east1");
     }
 
     // ============================================================
