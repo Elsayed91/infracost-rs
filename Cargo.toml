@@ -64,9 +64,6 @@ path = "examples/gcp/nat_gateway.rs"
 [[example]]
 name = "gcp_forwarding_rule"
 path = "examples/gcp/forwarding_rule.rs"
-[[example]]
-name = "gcp_disk_from_json"
-path = "examples/gcp/disk_from_json.rs"
 
 # AWS examples
 [[example]]
@@ -96,9 +93,6 @@ path = "examples/aws/nat_gateway.rs"
 [[example]]
 name = "aws_alb"
 path = "examples/aws/alb.rs"
-[[example]]
-name = "aws_ebs_from_json"
-path = "examples/aws/ebs_from_json.rs"
 
 # Azure examples
 [[example]]
@@ -116,9 +110,6 @@ path = "examples/azure/snapshot.rs"
 [[example]]
 name = "azure_public_ip"
 path = "examples/azure/public_ip.rs"
-[[example]]
-name = "azure_managed_disk_from_json"
-path = "examples/azure/managed_disk_from_json.rs"
 
 [dependencies]
 # GraphQL

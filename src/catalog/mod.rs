@@ -39,6 +39,7 @@ pub static AWS_CATALOG: LazyLock<ResourceCatalog> = LazyLock::new(|| {
             include_str!("../../resources/aws/elastic-ip.yaml"),
             include_str!("../../resources/aws/nat-gateway.yaml"),
             include_str!("../../resources/aws/alb.yaml"),
+            include_str!("../../resources/aws/ec2-instance.yaml"),
         ],
     )
 });
@@ -88,10 +89,7 @@ mod tests {
         assert!(cat.find("backend-service").is_ok());
         assert!(cat.find("backend-service/premium").is_ok());
         assert!(cat.find("backend-service/standard").is_ok());
-        assert!(cat.find("compute-instance/n2").is_ok());
-        assert!(cat.find("compute-instance/n2-spot").is_ok());
-        assert!(cat.find("compute-instance/e2").is_ok());
-        assert!(cat.find("compute-instance/e2-spot").is_ok());
+        assert!(cat.find("compute-instance").is_ok());
     }
 
     #[test]
@@ -104,6 +102,7 @@ mod tests {
         assert!(cat.find("elastic-ip").is_ok());
         assert!(cat.find("nat-gateway").is_ok());
         assert!(cat.find("alb").is_ok());
+        assert!(cat.find("ec2-instance").is_ok());
     }
 
     #[test]

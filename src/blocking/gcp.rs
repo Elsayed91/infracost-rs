@@ -21,7 +21,7 @@
 //! }
 //! ```
 
-use crate::providers::gcp::{BackendServiceTier, DiskType, MachineFamily};
+use crate::providers::gcp::{BackendServiceTier, DiskType, PurchaseOption};
 use std::sync::Arc;
 
 // ============================================================
@@ -89,12 +89,9 @@ impl BlockingGcpProvider {
     }
 
     /// Query GCP Compute Instance pricing.
-    pub fn compute_instance(
-        self,
-        machine_family: impl Into<MachineFamily>,
-    ) -> BlockingGcpComputeInstanceBuilder {
+    pub fn compute_instance(self) -> BlockingGcpComputeInstanceBuilder {
         BlockingGcpComputeInstanceBuilder {
-            inner: self.client.gcp().compute_instance(machine_family),
+            inner: self.client.gcp().compute_instance(),
             runtime: self.runtime,
         }
     }
@@ -152,8 +149,11 @@ blocking_builder! {
 blocking_builder! {
     /// Blocking builder for querying GCP Compute Instance prices.
     pub struct BlockingGcpComputeInstanceBuilder wraps crate::providers::gcp::ComputeInstanceBuilder {
+        fn machine_type(&str);
+        fn machine_family(&str);
         fn cpu_cores(u64);
         fn memory_gib(u64);
+        fn purchase_option(PurchaseOption);
     }
 }
 
@@ -261,22 +261,22 @@ mod tests {
         // Compute Instance builder
         let _ = client
             .gcp()
-            .compute_instance(MachineFamily::N2)
+            .compute_instance()
+            .machine_type("n2-standard-4")
             .region("us-central1")
             .fetch()
             .unwrap();
         let _ = client
             .gcp()
-            .compute_instance(MachineFamily::N2)
-            .cpu_cores(4)
-            .memory_gib(16)
+            .compute_instance()
+            .machine_type("n2-standard-4")
             .fetch_monthly()
             .unwrap();
         let _ = client
             .gcp()
-            .compute_instance(MachineFamily::E2Spot)
-            .cpu_cores(2)
-            .memory_gib(8)
+            .compute_instance()
+            .machine_type("e2-medium")
+            .purchase_option(PurchaseOption::Preemptible)
             .fetch_monthly()
             .unwrap();
     }

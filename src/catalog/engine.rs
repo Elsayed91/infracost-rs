@@ -6,7 +6,7 @@ use crate::providers::{PriceResult, PriceSource};
 use crate::types::ProductFilter;
 use crate::{Client, Result};
 
-use super::types::*;
+use super::types::{substitute_params, *};
 
 /// The pricing engine: builds filters from YAML definitions, queries the API,
 /// applies post-filters, and computes costs.
@@ -36,7 +36,16 @@ impl PricingEngine {
 
         let default_price = override_default.unwrap_or(component.default_price);
 
-        Self::fetch_component_price(client, component, vendor, region, api_key, default_price).await
+        Self::fetch_component_price(
+            client,
+            component,
+            vendor,
+            region,
+            api_key,
+            default_price,
+            None,
+        )
+        .await
     }
 
     /// Fetch total monthly cost by summing all cost components.
@@ -47,6 +56,22 @@ impl PricingEngine {
         region: &str,
         api_key: Option<&str>,
         params: &HashMap<String, u64>,
+    ) -> Result<PriceResult> {
+        Self::fetch_monthly_with_string_params(
+            client, resource, vendor, region, api_key, params, None,
+        )
+        .await
+    }
+
+    /// Fetch total monthly cost with optional string parameters for filter substitution.
+    pub async fn fetch_monthly_with_string_params(
+        client: &Client,
+        resource: &ResourceDef,
+        vendor: &str,
+        region: &str,
+        api_key: Option<&str>,
+        params: &HashMap<String, u64>,
+        string_params: Option<&HashMap<String, String>>,
     ) -> Result<PriceResult> {
         let mut total = 0.0;
         let mut all_from_api = true;
@@ -59,6 +84,7 @@ impl PricingEngine {
                 region,
                 api_key,
                 component.default_price,
+                string_params,
             )
             .await?;
 
@@ -100,6 +126,7 @@ impl PricingEngine {
         region: &str,
         api_key: Option<&str>,
         default_price: f64,
+        string_params: Option<&HashMap<String, String>>,
     ) -> Result<PriceResult> {
         let unit = &component.unit;
 
@@ -117,13 +144,29 @@ impl PricingEngine {
             return Ok(PriceResult::from_default(default_price, unit));
         }
 
-        // Build the filter from YAML query definition
-        let filter = Self::build_filter(&component.query, vendor, region);
+        // Build the filter from YAML query definition (with parameter substitution if provided)
+        let filter =
+            Self::build_filter_with_params(&component.query, vendor, region, string_params);
+
+        // Apply parameter substitution to post_filter and price_filter if string_params provided
+        let post_filter = if let (Some(pf), Some(params)) = (&component.post_filter, string_params)
+        {
+            Some(pf.substitute(params))
+        } else {
+            component.post_filter.clone()
+        };
+
+        let price_filter =
+            if let (Some(pf), Some(params)) = (&component.price_filter, string_params) {
+                Some(pf.substitute(params))
+            } else {
+                component.price_filter.clone()
+            };
 
         match client.query_products_with_key(filter, api_key).await {
             Ok(products) if !products.is_empty() => {
                 // Apply post-filter if defined
-                let selected = if let Some(ref pf) = component.post_filter {
+                let selected = if let Some(ref pf) = post_filter {
                     Self::apply_post_filter(&products, pf)
                 } else {
                     Some(&products[0])
@@ -132,8 +175,8 @@ impl PricingEngine {
                 let mut price = selected
                     .map(|p| {
                         // Apply price-level filter if defined (e.g., Consumption for Azure)
-                        if let Some(ref price_filter) = component.price_filter
-                            && let Some(ref po) = price_filter.purchase_option
+                        if let Some(ref pf) = price_filter
+                            && let Some(ref po) = pf.purchase_option
                         {
                             return p
                                 .prices()
@@ -195,6 +238,19 @@ impl PricingEngine {
 
     /// Build a ProductFilter from the YAML query definition.
     fn build_filter(query: &QueryDef, vendor: &str, region: &str) -> ProductFilter {
+        Self::build_filter_with_params(query, vendor, region, None)
+    }
+
+    /// Build a ProductFilter from the YAML query definition, with optional parameter substitution.
+    ///
+    /// When `string_params` is provided, `{{param_name}}` placeholders in attribute values
+    /// are replaced with the corresponding parameter values.
+    fn build_filter_with_params(
+        query: &QueryDef,
+        vendor: &str,
+        region: &str,
+        string_params: Option<&HashMap<String, String>>,
+    ) -> ProductFilter {
         let mut builder = ProductFilter::builder().vendor(vendor).region(region);
 
         if let Some(ref service) = query.service {
@@ -204,7 +260,12 @@ impl PricingEngine {
             builder = builder.product_family(pf);
         }
         for attr in &query.attributes {
-            builder = builder.attribute(&attr.key, &attr.value);
+            let value = if let Some(params) = string_params {
+                substitute_params(&attr.value, params)
+            } else {
+                attr.value.clone()
+            };
+            builder = builder.attribute(&attr.key, &value);
         }
         for regex in &query.attribute_regexes {
             builder = builder.attribute_regex(&regex.key, &regex.pattern);
@@ -419,6 +480,7 @@ impl PricingEngine {
                         region,
                         api_key,
                         component.default_price,
+                        None,
                     )
                     .await?;
 

@@ -1,14 +1,18 @@
-# GCP Compute Instance pricing - N2 and E2 machine families
-# Each variant has CPU and RAM cost components, split by purchase option.
+# GCP Compute Instance pricing - Parameterized
+# Uses {{machine_family}} and {{purchase_option}} for dynamic filtering
 #
-# Note: Both CPU and RAM are priced hourly. The monthly cost is calculated
-# in the builder as: (cpu_hourly * 730 * cpu_cores) + (ram_hourly * 730 * memory_gib)
+# Supported machine families: N2, E2, N2D, C2, C2D, M1, M2, M3, etc.
+# Supported purchase options: OnDemand, Preemptible
+#
+# The description prefix varies by purchase option:
+# - OnDemand: "{{description_prefix}} Instance Core running"
+# - Preemptible: "Spot Preemptible {{description_prefix}} Instance Core running"
+#
+# The builder constructs the full description_prefix parameter based on
+# machine_family and purchase_option.
 
-# ============================================================
-# N2 (2nd Gen Intel) - On-Demand
-# ============================================================
-- name: compute-instance/n2
-  display_name: "N2 Instance (On-Demand)"
+- name: compute-instance
+  display_name: "Compute Engine Instance"
   default_region: us-central1
   parameters:
     - { name: cpu_cores, required_for_monthly: true }
@@ -24,13 +28,14 @@
         attributes:
           - { key: resourceGroup, value: CPU }
       post_filter:
-        description_starts_with: "N2 Instance Core running"
+        description_starts_with: "{{description_prefix}} Instance Core running"
       price_filter:
-        purchase_option: on_demand
+        purchase_option: "{{purchase_option}}"
       pricing_model:
         type: linear
         quantity_param: cpu_cores
-    - name: ram
+
+    - name: memory
       is_primary: false
       unit: gibibyte hour
       default_price: 0.004237
@@ -40,138 +45,9 @@
         attributes:
           - { key: resourceGroup, value: RAM }
       post_filter:
-        description_starts_with: "N2 Instance Ram running"
+        description_starts_with: "{{description_prefix}} Instance Ram running"
       price_filter:
-        purchase_option: on_demand
-      pricing_model:
-        type: linear
-        quantity_param: memory_gib
-
-# ============================================================
-# N2 (2nd Gen Intel) - Preemptible/Spot
-# ============================================================
-- name: compute-instance/n2-spot
-  display_name: "N2 Instance (Spot/Preemptible)"
-  default_region: us-central1
-  parameters:
-    - { name: cpu_cores, required_for_monthly: true }
-    - { name: memory_gib, required_for_monthly: true }
-  cost_components:
-    - name: cpu
-      is_primary: true
-      unit: hour
-      default_price: 0.00985
-      query:
-        service: "Compute Engine"
-        product_family: Compute
-        attributes:
-          - { key: resourceGroup, value: CPU }
-      post_filter:
-        description_starts_with: "Spot Preemptible N2 Instance Core running"
-      price_filter:
-        purchase_option: preemptible
-      pricing_model:
-        type: linear
-        quantity_param: cpu_cores
-    - name: ram
-      is_primary: false
-      unit: gibibyte hour
-      default_price: 0.001318
-      query:
-        service: "Compute Engine"
-        product_family: Compute
-        attributes:
-          - { key: resourceGroup, value: RAM }
-      post_filter:
-        description_starts_with: "Spot Preemptible N2 Instance Ram running"
-      price_filter:
-        purchase_option: preemptible
-      pricing_model:
-        type: linear
-        quantity_param: memory_gib
-
-# ============================================================
-# E2 (Cost-optimized) - On-Demand
-# ============================================================
-- name: compute-instance/e2
-  display_name: "E2 Instance (On-Demand)"
-  default_region: us-central1
-  parameters:
-    - { name: cpu_cores, required_for_monthly: true }
-    - { name: memory_gib, required_for_monthly: true }
-  cost_components:
-    - name: cpu
-      is_primary: true
-      unit: hour
-      default_price: 0.02181159
-      query:
-        service: "Compute Engine"
-        product_family: Compute
-        attributes:
-          - { key: resourceGroup, value: CPU }
-      post_filter:
-        description_starts_with: "E2 Instance Core running"
-      price_filter:
-        purchase_option: on_demand
-      pricing_model:
-        type: linear
-        quantity_param: cpu_cores
-    - name: ram
-      is_primary: false
-      unit: gibibyte hour
-      default_price: 0.00292353
-      query:
-        service: "Compute Engine"
-        product_family: Compute
-        attributes:
-          - { key: resourceGroup, value: RAM }
-      post_filter:
-        description_starts_with: "E2 Instance Ram running"
-      price_filter:
-        purchase_option: on_demand
-      pricing_model:
-        type: linear
-        quantity_param: memory_gib
-
-# ============================================================
-# E2 (Cost-optimized) - Preemptible/Spot
-# ============================================================
-- name: compute-instance/e2-spot
-  display_name: "E2 Instance (Spot/Preemptible)"
-  default_region: us-central1
-  parameters:
-    - { name: cpu_cores, required_for_monthly: true }
-    - { name: memory_gib, required_for_monthly: true }
-  cost_components:
-    - name: cpu
-      is_primary: true
-      unit: hour
-      default_price: 0.01007
-      query:
-        service: "Compute Engine"
-        product_family: Compute
-        attributes:
-          - { key: resourceGroup, value: CPU }
-      post_filter:
-        description_starts_with: "Spot Preemptible E2 Instance Core running"
-      price_filter:
-        purchase_option: preemptible
-      pricing_model:
-        type: linear
-        quantity_param: cpu_cores
-    - name: ram
-      is_primary: false
-      unit: gibibyte hour
-      default_price: 0.00135
-      query:
-        service: "Compute Engine"
-        product_family: Compute
-        attributes:
-          - { key: resourceGroup, value: RAM }
-      post_filter:
-        description_starts_with: "Spot Preemptible E2 Instance Ram running"
-      price_filter:
-        purchase_option: preemptible
+        purchase_option: "{{purchase_option}}"
       pricing_model:
         type: linear
         quantity_param: memory_gib

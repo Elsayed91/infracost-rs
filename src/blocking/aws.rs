@@ -71,6 +71,14 @@ impl BlockingAwsProvider {
             runtime: self.runtime,
         }
     }
+
+    /// Query AWS EC2 Instance pricing.
+    pub fn ec2_instance(self, instance_type: impl Into<String>) -> BlockingAwsEc2InstanceBuilder {
+        BlockingAwsEc2InstanceBuilder {
+            inner: self.client.aws().ec2_instance(instance_type),
+            runtime: self.runtime,
+        }
+    }
 }
 
 // ============================================================
@@ -110,6 +118,15 @@ blocking_builder! {
     /// Blocking builder for querying AWS Application Load Balancer prices.
     pub struct BlockingAwsAlbBuilder wraps crate::providers::aws::AlbBuilder {
         fn lcu_hours(u64);
+    }
+}
+
+blocking_builder! {
+    /// Blocking builder for querying AWS EC2 Instance prices.
+    pub struct BlockingAwsEc2InstanceBuilder wraps crate::providers::aws::Ec2InstanceBuilder {
+        fn operating_system(&str);
+        fn tenancy(&str);
+        fn pre_installed_sw(&str);
     }
 }
 
@@ -178,6 +195,26 @@ mod tests {
         // ALB builder
         let _ = client.aws().alb().region("us-east-1").fetch().unwrap();
         let _ = client.aws().alb().lcu_hours(10000).fetch_monthly().unwrap();
+
+        // EC2 Instance builder
+        let _ = client
+            .aws()
+            .ec2_instance("t3.micro")
+            .region("us-east-1")
+            .fetch()
+            .unwrap();
+        let _ = client
+            .aws()
+            .ec2_instance("t3.micro")
+            .fetch_monthly()
+            .unwrap();
+        let _ = client
+            .aws()
+            .ec2_instance("m5.xlarge")
+            .operating_system("Windows")
+            .tenancy("Shared")
+            .fetch()
+            .unwrap();
     }
 
     /// Verify blocking wrappers properly delegate complex builders.

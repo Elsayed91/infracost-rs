@@ -113,7 +113,7 @@ pub struct AttributeRegexDef {
 }
 
 /// Post-query filtering rules applied to API results.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct PostFilterDef {
     #[serde(default)]
     pub description_starts_with: Option<String>,
@@ -127,11 +127,54 @@ pub struct PostFilterDef {
     pub usagetype_excludes: Vec<String>,
 }
 
+impl PostFilterDef {
+    /// Substitute {{param_name}} placeholders with actual values.
+    pub fn substitute(&self, params: &std::collections::HashMap<String, String>) -> Self {
+        Self {
+            description_starts_with: self
+                .description_starts_with
+                .as_ref()
+                .map(|s| substitute_params(s, params)),
+            description_contains: self
+                .description_contains
+                .iter()
+                .map(|s| substitute_params(s, params))
+                .collect(),
+            description_excludes: self
+                .description_excludes
+                .iter()
+                .map(|s| substitute_params(s, params))
+                .collect(),
+            usagetype_ends_with: self
+                .usagetype_ends_with
+                .as_ref()
+                .map(|s| substitute_params(s, params)),
+            usagetype_excludes: self
+                .usagetype_excludes
+                .iter()
+                .map(|s| substitute_params(s, params))
+                .collect(),
+        }
+    }
+}
+
 /// Price-level filtering (e.g., Consumption vs Reservation for Azure).
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct PriceFilterDef {
     #[serde(default)]
     pub purchase_option: Option<String>,
+}
+
+impl PriceFilterDef {
+    /// Substitute {{param_name}} placeholders with actual values.
+    pub fn substitute(&self, params: &std::collections::HashMap<String, String>) -> Self {
+        Self {
+            purchase_option: self
+                .purchase_option
+                .as_ref()
+                .map(|s| substitute_params(s, params)),
+        }
+    }
 }
 
 /// Transform applied to the price after extraction.
@@ -195,9 +238,57 @@ pub struct TierQueryFilterDef {
     pub attribute_regex: Option<AttributeRegexDef>,
 }
 
+/// Replace {{param_name}} placeholders with actual values from the params map.
+pub(crate) fn substitute_params(
+    template: &str,
+    params: &std::collections::HashMap<String, String>,
+) -> String {
+    let mut result = template.to_string();
+    for (key, value) in params {
+        let placeholder = format!("{{{{{}}}}}", key);
+        result = result.replace(&placeholder, value);
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parameter_substitution() {
+        let mut params = std::collections::HashMap::new();
+        params.insert("machine_family".to_string(), "N2".to_string());
+        params.insert("purchase_option".to_string(), "on_demand".to_string());
+
+        // Test post_filter substitution
+        let post_filter = PostFilterDef {
+            description_starts_with: Some("{{machine_family}} Instance Core running".to_string()),
+            description_contains: vec!["{{machine_family}}".to_string()],
+            description_excludes: vec!["{{purchase_option}}".to_string()],
+            usagetype_ends_with: None,
+            usagetype_excludes: vec![],
+        };
+
+        let substituted = post_filter.substitute(&params);
+        assert_eq!(
+            substituted.description_starts_with,
+            Some("N2 Instance Core running".to_string())
+        );
+        assert_eq!(substituted.description_contains, vec!["N2".to_string()]);
+        assert_eq!(
+            substituted.description_excludes,
+            vec!["on_demand".to_string()]
+        );
+
+        // Test price_filter substitution
+        let price_filter = PriceFilterDef {
+            purchase_option: Some("{{purchase_option}}".to_string()),
+        };
+
+        let substituted = price_filter.substitute(&params);
+        assert_eq!(substituted.purchase_option, Some("on_demand".to_string()));
+    }
 
     #[test]
     fn test_parse_simple_resource() {

@@ -156,6 +156,7 @@ async fn validate_component(
         region,
         None,
         component.default_price,
+        None,
     )
     .await;
 

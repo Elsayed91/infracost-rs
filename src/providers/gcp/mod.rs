@@ -28,7 +28,7 @@ mod snapshot;
 mod static_ip;
 
 pub use backend_service::{BackendServiceBuilder, BackendServiceTier};
-pub use compute_instance::{ComputeInstanceBuilder, MachineFamily};
+pub use compute_instance::{ComputeInstanceBuilder, PurchaseOption};
 pub use disk::{DiskBuilder, DiskType};
 pub use forwarding_rule::ForwardingRuleBuilder;
 pub use nat_gateway::NatGatewayBuilder;
@@ -130,20 +130,37 @@ impl GcpProvider {
 
     /// Query GCP Compute Instance pricing.
     ///
+    /// Supports parsing machine types (e.g., "n2-standard-4") or manual specs.
     /// Compute instances are priced by CPU cores and RAM separately.
-    /// Use `cpu_cores()` and `memory_gib()` to calculate total monthly cost.
     ///
-    /// # Example
+    /// # Example with machine type
     ///
     /// ```no_run
     /// use infracost_rs::Client;
-    /// use infracost_rs::providers::gcp::MachineFamily;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
     /// let client = Client::anonymous();
     /// let cost = client
     ///     .gcp()
-    ///     .compute_instance(MachineFamily::N2)
+    ///     .compute_instance()
+    ///     .machine_type("n2-standard-4")
+    ///     .fetch_monthly()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Example with manual specs
+    ///
+    /// ```no_run
+    /// use infracost_rs::Client;
+    ///
+    /// # async fn example() -> Result<(), infracost_rs::Error> {
+    /// let client = Client::anonymous();
+    /// let cost = client
+    ///     .gcp()
+    ///     .compute_instance()
+    ///     .machine_family("n2")
     ///     .cpu_cores(4)
     ///     .memory_gib(16)
     ///     .fetch_monthly()
@@ -151,10 +168,7 @@ impl GcpProvider {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn compute_instance(
-        self,
-        machine_family: impl Into<MachineFamily>,
-    ) -> ComputeInstanceBuilder {
-        ComputeInstanceBuilder::new(self.client, machine_family.into())
+    pub fn compute_instance(self) -> ComputeInstanceBuilder {
+        ComputeInstanceBuilder::new(self.client)
     }
 }

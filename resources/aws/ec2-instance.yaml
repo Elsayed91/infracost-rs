@@ -1,0 +1,26 @@
+- name: ec2-instance
+  display_name: "EC2 Instance"
+  default_region: us-east-1
+  parameters:
+    - { name: instance_type, required_for_monthly: false }
+    - { name: operating_system, required_for_monthly: false }
+    - { name: tenancy, required_for_monthly: false }
+    - { name: pre_installed_sw, required_for_monthly: false }
+  cost_components:
+    - name: compute-hours
+      is_primary: true
+      unit: hour
+      default_price: 0.0104
+      query:
+        service: AmazonEC2
+        product_family: Compute Instance
+        attributes:
+          - { key: instanceType, value: "{{instance_type}}" }
+          - { key: tenancy, value: "{{tenancy}}" }
+          - { key: operatingSystem, value: "{{operating_system}}" }
+          - { key: preInstalledSw, value: "{{pre_installed_sw}}" }
+          - { key: capacitystatus, value: Used }
+      price_filter:
+        purchase_option: on_demand
+      pricing_model:
+        type: hourly_to_monthly

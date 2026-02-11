@@ -21,12 +21,14 @@
 
 mod alb;
 mod ebs;
+mod ec2_instance;
 mod elastic_ip;
 mod nat_gateway;
 mod snapshot;
 
 pub use alb::AlbBuilder;
 pub use ebs::{EbsBuilder, EbsType};
+pub use ec2_instance::Ec2InstanceBuilder;
 pub use elastic_ip::ElasticIpBuilder;
 pub use nat_gateway::NatGatewayBuilder;
 pub use snapshot::SnapshotBuilder;
@@ -95,5 +97,15 @@ impl AwsProvider {
     /// Note: Additional LCU charges apply
     pub fn alb(self) -> AlbBuilder {
         AlbBuilder::new(self.client)
+    }
+
+    /// Query AWS EC2 Instance pricing.
+    ///
+    /// Pass any EC2 instance type string (e.g., "t3.micro", "m5.xlarge", "c5.2xlarge").
+    /// No hardcoded instance types - any valid EC2 instance type is supported.
+    ///
+    /// Default: $0.0104/hour (t3.micro, Linux, Shared, us-east-1)
+    pub fn ec2_instance(self, instance_type: impl Into<String>) -> Ec2InstanceBuilder {
+        Ec2InstanceBuilder::new(self.client, instance_type)
     }
 }
