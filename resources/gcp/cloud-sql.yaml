@@ -1,0 +1,110 @@
+# GCP Cloud SQL pricing - Parameterized
+# Uses {{engine_name}} and {{availability}} for dynamic filtering
+#
+# Supported engines: MySQL, PostgreSQL, SQL Server
+# Supported availability types: Zonal, Regional (HA = 2x price)
+#
+# Description patterns:
+# - "Cloud SQL for {{engine_name}}: {{availability}} - vCPU in {{LOCATION}}"
+# - "Cloud SQL for {{engine_name}}: {{availability}} - RAM in {{LOCATION}}"
+# - "Cloud SQL for {{engine_name}}: {{availability}} - Standard storage in {{LOCATION}}"
+# - "Cloud SQL" ... "Backup" (backup storage)
+
+- name: cloud-sql
+  display_name: "Cloud SQL Instance"
+  default_region: us-central1
+  parameters:
+    - { name: cpu_count, required_for_monthly: true }
+    - { name: memory_gb, required_for_monthly: true }
+    - { name: storage_gb, required_for_monthly: false }
+    - { name: backup_storage_gb, required_for_monthly: false }
+  cost_components:
+    - name: cpu
+      is_primary: true
+      unit: hour
+      default_price: 0.0413
+      query:
+        service: "Cloud SQL"
+        attributes:
+          - { key: resourceGroup, value: SQLGen2InstancesCPU }
+      post_filter:
+        description_contains:
+          - "Cloud SQL for {{engine_name}}"
+          - "{{availability}}"
+          - "vCPU"
+        description_excludes:
+          - "Enterprise Plus"
+      pricing_model:
+        type: linear
+        quantity_param: cpu_count
+
+    - name: memory
+      is_primary: false
+      unit: gibibyte hour
+      default_price: 0.007
+      query:
+        service: "Cloud SQL"
+        attributes:
+          - { key: resourceGroup, value: SQLGen2InstancesRAM }
+      post_filter:
+        description_contains:
+          - "Cloud SQL for {{engine_name}}"
+          - "{{availability}}"
+          - "RAM"
+        description_excludes:
+          - "Enterprise Plus"
+      pricing_model:
+        type: linear
+        quantity_param: memory_gb
+
+    - name: storage
+      is_primary: false
+      unit: GiB-month
+      default_price: 0.17
+      query:
+        service: "Cloud SQL"
+        attributes:
+          - { key: resourceGroup, value: SSD }
+      post_filter:
+        description_contains:
+          - "Cloud SQL for {{engine_name}}"
+          - "{{availability}}"
+          - "Standard storage"
+        description_excludes:
+          - "Enterprise Plus"
+          - "Hyperdisk"
+          - "Read Replica"
+      pricing_model:
+        type: linear
+        quantity_param: storage_gb
+
+    - name: backup
+      is_primary: false
+      unit: GiB-month
+      default_price: 0.08
+      query:
+        service: "Cloud SQL"
+        attributes:
+          - { key: resourceGroup, value: PDSnapshot }
+      post_filter:
+        description_contains:
+          - "Cloud SQL"
+          - "Backup"
+      pricing_model:
+        type: linear
+        quantity_param: backup_storage_gb
+
+    - name: ip-address
+      is_primary: false
+      unit: hour
+      default_price: 0.01
+      query:
+        service: "Cloud SQL"
+        attributes:
+          - { key: resourceGroup, value: IpAddress }
+      post_filter:
+        description_contains:
+          - "Cloud SQL"
+          - "IP address"
+      pricing_model:
+        type: hourly_to_monthly

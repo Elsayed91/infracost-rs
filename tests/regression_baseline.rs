@@ -7,7 +7,7 @@
 use infracost_rs::Client;
 use infracost_rs::providers::aws::EbsType;
 use infracost_rs::providers::azure::{ManagedDiskSize, ManagedDiskType};
-use infracost_rs::providers::gcp::{BackendServiceTier, DiskType};
+use infracost_rs::providers::gcp::{BackendServiceTier, DiskType, SnapshotType};
 
 fn get_client() -> Client {
     let _ = dotenvy::dotenv();
@@ -58,30 +58,58 @@ async fn regression_snapshot_all_prices() {
         r.price, r.unit, r.source
     ));
 
-    // GCP Snapshot
+    // GCP Snapshot (standard)
     let r = client
         .gcp()
-        .snapshot()
+        .snapshot(SnapshotType::Standard)
         .region("us-central1")
         .fetch()
         .await
         .unwrap();
     results.push(format!(
-        "gcp/snapshot: price={}, unit={}, source={:?}",
+        "gcp/snapshot/standard: price={}, unit={}, source={:?}",
         r.price, r.unit, r.source
     ));
 
-    // GCP Snapshot monthly (100GB)
+    // GCP Snapshot standard monthly (100GB)
     let r = client
         .gcp()
-        .snapshot()
+        .snapshot(SnapshotType::Standard)
         .region("us-central1")
         .size_gb(100)
         .fetch_monthly()
         .await
         .unwrap();
     results.push(format!(
-        "gcp/snapshot/monthly/100gb: price={}, unit={}, source={:?}",
+        "gcp/snapshot/standard/monthly/100gb: price={}, unit={}, source={:?}",
+        r.price, r.unit, r.source
+    ));
+
+    // GCP Snapshot (archive)
+    let r = client
+        .gcp()
+        .snapshot(SnapshotType::Archive)
+        .region("us-central1")
+        .fetch()
+        .await
+        .unwrap();
+    results.push(format!(
+        "gcp/snapshot/archive: price={}, unit={}, source={:?}",
+        r.price, r.unit, r.source
+    ));
+
+    // GCP Snapshot archive monthly (100GB with 50GB retrieval)
+    let r = client
+        .gcp()
+        .snapshot(SnapshotType::Archive)
+        .region("us-central1")
+        .size_gb(100)
+        .retrieval_size_gb(50)
+        .fetch_monthly()
+        .await
+        .unwrap();
+    results.push(format!(
+        "gcp/snapshot/archive/monthly/100gb-50gb-retrieval: price={}, unit={}, source={:?}",
         r.price, r.unit, r.source
     ));
 

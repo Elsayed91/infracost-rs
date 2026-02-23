@@ -1,0 +1,60 @@
+- name: bigquery-storage
+  display_name: "BigQuery Storage"
+  default_region: us-central1
+  parameters:
+    - { name: active_logical_storage_gb, required_for_monthly: false }
+    - { name: long_term_logical_storage_gb, required_for_monthly: false }
+    - { name: active_physical_storage_gb, required_for_monthly: false }
+    - { name: long_term_physical_storage_gb, required_for_monthly: false }
+  cost_components:
+    - name: active-logical-storage
+      is_primary: true
+      unit: gibibyte month
+      default_price: 0.023
+      query:
+        service: "BigQuery"
+        attributes:
+          - { key: resourceGroup, value: ActiveStorage }
+      pricing_model:
+        type: linear
+        quantity_param: active_logical_storage_gb
+
+    - name: long-term-logical-storage
+      is_primary: false
+      unit: gibibyte month
+      default_price: 0.016
+      query:
+        service: "BigQuery"
+        attributes:
+          - { key: resourceGroup, value: LongTermStorage }
+      pricing_model:
+        type: linear
+        quantity_param: long_term_logical_storage_gb
+
+    - name: active-physical-storage
+      is_primary: false
+      unit: gibibyte month
+      default_price: 0.04
+      query:
+        service: "BigQuery"
+        attributes:
+          - { key: resourceGroup, value: PhysicalStorage }
+      post_filter:
+        description_starts_with: "Active Physical Storage"
+      pricing_model:
+        type: linear
+        quantity_param: active_physical_storage_gb
+
+    - name: long-term-physical-storage
+      is_primary: false
+      unit: gibibyte month
+      default_price: 0.02
+      query:
+        service: "BigQuery"
+        attributes:
+          - { key: resourceGroup, value: PhysicalStorage }
+      post_filter:
+        description_starts_with: "Long-Term Physical Storage"
+      pricing_model:
+        type: linear
+        quantity_param: long_term_physical_storage_gb

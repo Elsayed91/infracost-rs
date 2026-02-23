@@ -20,6 +20,8 @@
 //! ```
 
 mod backend_service;
+mod bigquery_storage;
+mod cloud_sql;
 mod compute_instance;
 mod disk;
 mod forwarding_rule;
@@ -28,11 +30,13 @@ mod snapshot;
 mod static_ip;
 
 pub use backend_service::{BackendServiceBuilder, BackendServiceTier};
+pub use bigquery_storage::BigQueryStorageBuilder;
+pub use cloud_sql::{CloudSqlAvailability, CloudSqlBuilder, CloudSqlEngine};
 pub use compute_instance::{ComputeInstanceBuilder, PurchaseOption};
 pub use disk::{DiskBuilder, DiskType};
 pub use forwarding_rule::ForwardingRuleBuilder;
 pub use nat_gateway::NatGatewayBuilder;
-pub use snapshot::SnapshotBuilder;
+pub use snapshot::{SnapshotBuilder, SnapshotType};
 pub use static_ip::StaticIpBuilder;
 
 use crate::Client;
@@ -73,9 +77,27 @@ impl GcpProvider {
 
     /// Query GCP Snapshot pricing.
     ///
-    /// Default: $0.05/GB-month
-    pub fn snapshot(self) -> SnapshotBuilder {
-        SnapshotBuilder::new(self.client)
+    /// Supports standard ($0.05/GiB-month) and archive ($0.019/GiB-month) snapshots.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use infracost_rs::Client;
+    /// use infracost_rs::providers::gcp::SnapshotType;
+    ///
+    /// # async fn example() -> Result<(), infracost_rs::Error> {
+    /// let client = Client::anonymous();
+    /// let price = client
+    ///     .gcp()
+    ///     .snapshot(SnapshotType::Standard)
+    ///     .region("us-central1")
+    ///     .fetch_price()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn snapshot(self, snapshot_type: impl Into<SnapshotType>) -> SnapshotBuilder {
+        SnapshotBuilder::new(self.client, snapshot_type.into())
     }
 
     /// Query GCP Static IP pricing.
@@ -126,6 +148,66 @@ impl GcpProvider {
     /// ```
     pub fn backend_service(self, tier: impl Into<BackendServiceTier>) -> BackendServiceBuilder {
         BackendServiceBuilder::new(self.client, tier.into())
+    }
+
+    /// Query GCP Cloud SQL pricing.
+    ///
+    /// Supports MySQL, PostgreSQL, and SQL Server engines with Zonal and
+    /// Regional (HA) availability types. Prices are per vCPU/hour for the
+    /// primary component.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use infracost_rs::Client;
+    /// use infracost_rs::providers::gcp::{CloudSqlEngine, CloudSqlAvailability};
+    ///
+    /// # async fn example() -> Result<(), infracost_rs::Error> {
+    /// let client = Client::anonymous();
+    /// let cost = client
+    ///     .gcp()
+    ///     .cloud_sql()
+    ///     .engine(CloudSqlEngine::PostgreSql)
+    ///     .availability(CloudSqlAvailability::Zonal)
+    ///     .cpu_count(4)
+    ///     .memory_gb(16)
+    ///     .storage_gb(100)
+    ///     .fetch_monthly()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn cloud_sql(self) -> CloudSqlBuilder {
+        CloudSqlBuilder::new(self.client)
+    }
+
+    /// Query GCP BigQuery Storage pricing.
+    ///
+    /// Supports logical and physical storage billing models.
+    /// - Active logical: $0.023/GiB-month
+    /// - Long-term logical: $0.016/GiB-month
+    /// - Active physical: $0.04/GiB-month
+    /// - Long-term physical: $0.02/GiB-month
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use infracost_rs::Client;
+    ///
+    /// # async fn example() -> Result<(), infracost_rs::Error> {
+    /// let client = Client::anonymous();
+    /// let cost = client
+    ///     .gcp()
+    ///     .bigquery_storage()
+    ///     .active_logical_storage_gb(500)
+    ///     .long_term_logical_storage_gb(200)
+    ///     .fetch_monthly()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn bigquery_storage(self) -> BigQueryStorageBuilder {
+        BigQueryStorageBuilder::new(self.client)
     }
 
     /// Query GCP Compute Instance pricing.

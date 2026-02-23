@@ -25,6 +25,8 @@ pub static GCP_CATALOG: LazyLock<ResourceCatalog> = LazyLock::new(|| {
             include_str!("../../resources/gcp/forwarding-rule.yaml"),
             include_str!("../../resources/gcp/backend-service.yaml"),
             include_str!("../../resources/gcp/compute-instance.yaml"),
+            include_str!("../../resources/gcp/cloud-sql.yaml"),
+            include_str!("../../resources/gcp/bigquery-storage.yaml"),
         ],
     )
 });
@@ -84,13 +86,16 @@ mod tests {
         assert_eq!(cat.vendor, "gcp");
         assert!(cat.find("disk/pd-ssd").is_ok());
         assert!(cat.find("static-ip").is_ok());
-        assert!(cat.find("snapshot").is_ok());
+        assert!(cat.find("snapshot/standard").is_ok());
+        assert!(cat.find("snapshot/archive").is_ok());
         assert!(cat.find("nat-gateway").is_ok());
         assert!(cat.find("forwarding-rule").is_ok());
         assert!(cat.find("backend-service").is_ok());
         assert!(cat.find("backend-service/premium").is_ok());
         assert!(cat.find("backend-service/standard").is_ok());
         assert!(cat.find("compute-instance").is_ok());
+        assert!(cat.find("cloud-sql").is_ok());
+        assert!(cat.find("bigquery-storage").is_ok());
     }
 
     #[test]

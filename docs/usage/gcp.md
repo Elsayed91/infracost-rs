@@ -44,11 +44,27 @@ let r = client.gcp().disk("pd-ssd").region("us-central1").fetch().await?;
 ## Snapshots
 
 ```rust
-let r = client.gcp().snapshot().region("us-central1").fetch().await?;
-// r.price = 0.05, r.unit = "GB-month"
+use infracost_rs::providers::gcp::SnapshotType;
 
-let r = client.gcp().snapshot().size_gb(100).fetch_monthly().await?;
+// Standard snapshot
+let r = client.gcp().snapshot(SnapshotType::Standard).region("us-central1").fetch().await?;
+// r.price = 0.05, r.unit = "GiB-month"
+
+let r = client.gcp().snapshot(SnapshotType::Standard).size_gb(100).fetch_monthly().await?;
 // r.price = 5.0
+
+// Archive snapshot (cheaper storage, optional retrieval cost)
+let r = client.gcp().snapshot(SnapshotType::Archive).region("us-central1").fetch().await?;
+// r.price = 0.019, r.unit = "GiB-month"
+
+let r = client.gcp().snapshot(SnapshotType::Archive)
+    .size_gb(500)
+    .retrieval_size_gb(100)  // optional one-time retrieval
+    .fetch_monthly().await?;
+// storage ($0.019 * 500) + retrieval ($0.019 * 100) = $11.40
+
+// String shorthand
+let r = client.gcp().snapshot("archive").region("us-central1").fetch().await?;
 ```
 
 ## Static IP

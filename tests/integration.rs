@@ -9,7 +9,7 @@
 
 use infracost_rs::providers::aws::EbsType;
 use infracost_rs::providers::azure::{ManagedDiskSize, ManagedDiskType};
-use infracost_rs::providers::gcp::{BackendServiceTier, DiskType};
+use infracost_rs::providers::gcp::{BackendServiceTier, DiskType, SnapshotType};
 use infracost_rs::{Client, ProductFilter};
 
 fn get_client() -> Option<Client> {
@@ -229,7 +229,7 @@ async fn test_gcp_snapshot_provider() {
 
     let result = client
         .gcp()
-        .snapshot()
+        .snapshot(SnapshotType::Standard)
         .region("us-central1")
         .fetch()
         .await
@@ -237,7 +237,75 @@ async fn test_gcp_snapshot_provider() {
 
     assert!(result.is_from_api(), "Should get price from API");
     assert!(result.price > 0.0, "Price should be positive");
-    assert_eq!(result.unit, "GB-month");
+    assert_eq!(result.unit, "GiB-month");
+}
+
+#[tokio::test]
+#[ignore = "Requires API key"]
+async fn test_gcp_archive_snapshot_provider() {
+    let client = get_client().expect("INFRACOST_API_KEY must be set");
+
+    // Test basic fetch (storage rate)
+    let result = client
+        .gcp()
+        .snapshot(SnapshotType::Archive)
+        .region("us-central1")
+        .fetch()
+        .await
+        .expect("Query should succeed");
+
+    assert!(result.is_from_api(), "Should get price from API");
+    assert!(result.price > 0.0, "Price should be positive");
+    assert_eq!(result.unit, "GiB-month");
+
+    // Archive should be cheaper than standard
+    let standard = client
+        .gcp()
+        .snapshot(SnapshotType::Standard)
+        .region("us-central1")
+        .fetch()
+        .await
+        .expect("Standard snapshot query should succeed");
+
+    assert!(
+        result.price < standard.price,
+        "Archive (${}) should be cheaper than standard (${})",
+        result.price,
+        standard.price
+    );
+
+    // Test fetch_monthly (storage only)
+    let monthly_storage = client
+        .gcp()
+        .snapshot(SnapshotType::Archive)
+        .region("us-central1")
+        .size_gb(500)
+        .fetch_monthly()
+        .await
+        .expect("Monthly storage query should succeed");
+
+    assert!(
+        monthly_storage.price > 0.0,
+        "Monthly storage price should be positive"
+    );
+    assert_eq!(monthly_storage.unit, "month");
+
+    // Test fetch_monthly (storage + retrieval)
+    let monthly_with_retrieval = client
+        .gcp()
+        .snapshot(SnapshotType::Archive)
+        .region("us-central1")
+        .size_gb(500)
+        .retrieval_size_gb(100)
+        .fetch_monthly()
+        .await
+        .expect("Monthly with retrieval query should succeed");
+
+    assert!(
+        monthly_with_retrieval.price > monthly_storage.price,
+        "Adding retrieval should increase monthly cost"
+    );
+    assert_eq!(monthly_with_retrieval.unit, "month");
 }
 
 #[tokio::test]

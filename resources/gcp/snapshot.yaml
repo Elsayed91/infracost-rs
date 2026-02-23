@@ -1,4 +1,4 @@
-- name: snapshot
+- name: snapshot/standard
   display_name: "Storage PD Snapshot"
   default_region: us-central1
   parameters:
@@ -6,7 +6,7 @@
   cost_components:
     - name: storage
       is_primary: true
-      unit: GB-month
+      unit: GiB-month
       default_price: 0.05
       query:
         service: "Compute Engine"
@@ -18,3 +18,41 @@
       pricing_model:
         type: linear
         quantity_param: size_gb
+
+- name: snapshot/archive
+  display_name: "Archive Snapshot"
+  default_region: us-central1
+  parameters:
+    - { name: size_gb, required_for_monthly: true }
+    - { name: retrieval_size_gb, required_for_monthly: false }
+  cost_components:
+    - name: storage
+      is_primary: true
+      unit: GiB-month
+      default_price: 0.019
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: PDSnapshot }
+      post_filter:
+        description_contains:
+          - "Archive Snapshot Data Storage"
+      pricing_model:
+        type: linear
+        quantity_param: size_gb
+    - name: retrieval
+      is_primary: false
+      unit: GiB
+      default_price: 0.019
+      query:
+        service: "Compute Engine"
+        product_family: Storage
+        attributes:
+          - { key: resourceGroup, value: PDSnapshot }
+      post_filter:
+        description_contains:
+          - "Archive Snapshot Retrieval"
+      pricing_model:
+        type: linear
+        quantity_param: retrieval_size_gb

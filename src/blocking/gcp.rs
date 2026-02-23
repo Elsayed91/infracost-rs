@@ -21,7 +21,10 @@
 //! }
 //! ```
 
-use crate::providers::gcp::{BackendServiceTier, DiskType, PurchaseOption};
+use crate::providers::gcp::{
+    BackendServiceTier, CloudSqlAvailability, CloudSqlEngine, DiskType, PurchaseOption,
+    SnapshotType,
+};
 use std::sync::Arc;
 
 // ============================================================
@@ -46,9 +49,9 @@ impl BlockingGcpProvider {
     }
 
     /// Query GCP Snapshot pricing.
-    pub fn snapshot(self) -> BlockingGcpSnapshotBuilder {
+    pub fn snapshot(self, snapshot_type: impl Into<SnapshotType>) -> BlockingGcpSnapshotBuilder {
         BlockingGcpSnapshotBuilder {
-            inner: self.client.gcp().snapshot(),
+            inner: self.client.gcp().snapshot(snapshot_type),
             runtime: self.runtime,
         }
     }
@@ -88,6 +91,22 @@ impl BlockingGcpProvider {
         }
     }
 
+    /// Query GCP Cloud SQL pricing.
+    pub fn cloud_sql(self) -> BlockingGcpCloudSqlBuilder {
+        BlockingGcpCloudSqlBuilder {
+            inner: self.client.gcp().cloud_sql(),
+            runtime: self.runtime,
+        }
+    }
+
+    /// Query GCP BigQuery Storage pricing.
+    pub fn bigquery_storage(self) -> BlockingGcpBigQueryStorageBuilder {
+        BlockingGcpBigQueryStorageBuilder {
+            inner: self.client.gcp().bigquery_storage(),
+            runtime: self.runtime,
+        }
+    }
+
     /// Query GCP Compute Instance pricing.
     pub fn compute_instance(self) -> BlockingGcpComputeInstanceBuilder {
         BlockingGcpComputeInstanceBuilder {
@@ -115,6 +134,7 @@ blocking_builder! {
     /// Blocking builder for querying GCP snapshot prices.
     pub struct BlockingGcpSnapshotBuilder wraps crate::providers::gcp::SnapshotBuilder {
         fn size_gb(u64);
+        fn retrieval_size_gb(u64);
     }
 }
 
@@ -143,6 +163,28 @@ blocking_builder! {
     pub struct BlockingGcpBackendServiceBuilder wraps crate::providers::gcp::BackendServiceBuilder {
         fn data_processed_gb(u64);
         fn forwarding_rules(u64);
+    }
+}
+
+blocking_builder! {
+    /// Blocking builder for querying GCP Cloud SQL prices.
+    pub struct BlockingGcpCloudSqlBuilder wraps crate::providers::gcp::CloudSqlBuilder {
+        fn engine(CloudSqlEngine);
+        fn availability(CloudSqlAvailability);
+        fn cpu_count(u64);
+        fn memory_gb(u64);
+        fn storage_gb(u64);
+        fn backup_storage_gb(u64);
+    }
+}
+
+blocking_builder! {
+    /// Blocking builder for querying GCP BigQuery Storage prices.
+    pub struct BlockingGcpBigQueryStorageBuilder wraps crate::providers::gcp::BigQueryStorageBuilder {
+        fn active_logical_storage_gb(u64);
+        fn long_term_logical_storage_gb(u64);
+        fn active_physical_storage_gb(u64);
+        fn long_term_physical_storage_gb(u64);
     }
 }
 
@@ -193,17 +235,32 @@ mod tests {
             .fetch_monthly()
             .unwrap();
 
-        // Snapshot builder
+        // Snapshot builder (standard)
         let _ = client
             .gcp()
-            .snapshot()
+            .snapshot(SnapshotType::Standard)
             .region("us-central1")
             .fetch()
             .unwrap();
         let _ = client
             .gcp()
-            .snapshot()
+            .snapshot(SnapshotType::Standard)
             .size_gb(100)
+            .fetch_monthly()
+            .unwrap();
+
+        // Snapshot builder (archive)
+        let _ = client
+            .gcp()
+            .snapshot(SnapshotType::Archive)
+            .region("us-central1")
+            .fetch()
+            .unwrap();
+        let _ = client
+            .gcp()
+            .snapshot(SnapshotType::Archive)
+            .size_gb(100)
+            .retrieval_size_gb(50)
             .fetch_monthly()
             .unwrap();
 
@@ -255,6 +312,40 @@ mod tests {
             .gcp()
             .backend_service(BackendServiceTier::Standard)
             .data_processed_gb(1000)
+            .fetch_monthly()
+            .unwrap();
+
+        // Cloud SQL builder
+        let _ = client
+            .gcp()
+            .cloud_sql()
+            .engine(CloudSqlEngine::PostgreSql)
+            .region("us-central1")
+            .fetch()
+            .unwrap();
+        let _ = client
+            .gcp()
+            .cloud_sql()
+            .engine(CloudSqlEngine::MySql)
+            .availability(CloudSqlAvailability::Zonal)
+            .cpu_count(2)
+            .memory_gb(8)
+            .storage_gb(100)
+            .fetch_monthly()
+            .unwrap();
+
+        // BigQuery Storage builder
+        let _ = client
+            .gcp()
+            .bigquery_storage()
+            .region("us-central1")
+            .fetch()
+            .unwrap();
+        let _ = client
+            .gcp()
+            .bigquery_storage()
+            .active_logical_storage_gb(500)
+            .long_term_logical_storage_gb(200)
             .fetch_monthly()
             .unwrap();
 
