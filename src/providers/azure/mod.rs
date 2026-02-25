@@ -36,11 +36,15 @@
 //! # }
 //! ```
 
+mod load_balancer_rules;
 mod managed_disk;
+mod nat_gateway;
 mod public_ip;
 mod snapshot;
 
+pub use load_balancer_rules::LoadBalancerRulesBuilder;
 pub use managed_disk::{ManagedDiskBuilder, ManagedDiskSize, ManagedDiskType};
+pub use nat_gateway::NatGatewayBuilder;
 pub use public_ip::PublicIpBuilder;
 pub use snapshot::SnapshotBuilder;
 
@@ -133,5 +137,56 @@ impl AzureProvider {
     /// ```
     pub fn public_ip(self) -> PublicIpBuilder {
         PublicIpBuilder::new(self.client)
+    }
+
+    /// Query Load Balancer Rules pricing.
+    ///
+    /// Azure Load Balancer Rules use tiered pricing:
+    /// - First 5 rules: $0.025/rule/hr
+    /// - Additional rules beyond 5: $0.01/rule/hr
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use infracost_rs::Client;
+    ///
+    /// # async fn example() -> Result<(), infracost_rs::Error> {
+    /// let client = Client::anonymous();
+    /// let monthly = client
+    ///     .azure()
+    ///     .load_balancer_rules()
+    ///     .rule_count(10)
+    ///     .fetch_monthly()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn load_balancer_rules(self) -> LoadBalancerRulesBuilder {
+        LoadBalancerRulesBuilder::new(self.client)
+    }
+
+    /// Query NAT Gateway pricing.
+    ///
+    /// Returns the per-hour price for a Standard NAT Gateway.
+    /// Additional data processing charges apply ($0.045/GB).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use infracost_rs::Client;
+    ///
+    /// # async fn example() -> Result<(), infracost_rs::Error> {
+    /// let client = Client::anonymous();
+    /// let monthly = client
+    ///     .azure()
+    ///     .nat_gateway()
+    ///     .data_processed_gb(1000)
+    ///     .fetch_monthly()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn nat_gateway(self) -> NatGatewayBuilder {
+        NatGatewayBuilder::new(self.client)
     }
 }

@@ -1,0 +1,38 @@
+- name: nat-gateway
+  display_name: "NAT Gateway"
+  default_region: Global
+  parameters:
+    - { name: data_processed_gb, required_for_monthly: false }
+  cost_components:
+    - name: uptime
+      is_primary: true
+      unit: hour
+      default_price: 0.045
+      query:
+        service: NAT Gateway
+        product_family: Networking
+        attributes:
+          - { key: productName, value: NAT Gateway }
+          - { key: skuName, value: Standard }
+          - { key: meterName, value: Standard Gateway }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: hourly_to_monthly
+
+    - name: data_processing
+      is_primary: false
+      unit: GB
+      default_price: 0.045
+      query:
+        service: NAT Gateway
+        product_family: Networking
+        attributes:
+          - { key: productName, value: NAT Gateway }
+          - { key: skuName, value: Standard }
+          - { key: meterName, value: Standard Data Processed }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: linear
+        quantity_param: data_processed_gb

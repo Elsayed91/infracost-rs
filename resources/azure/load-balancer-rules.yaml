@@ -1,0 +1,37 @@
+- name: load-balancer-rules
+  display_name: "Load Balancer Rules"
+  default_region: Global
+  parameters:
+    - { name: rule_count, required_for_monthly: true }
+  cost_components:
+    - name: tier1
+      is_primary: true
+      unit: hour
+      default_price: 0.025
+      query:
+        service: Load Balancer
+        product_family: Networking
+        attributes:
+          - { key: productName, value: Load Balancer }
+          - { key: skuName, value: Standard }
+          - { key: meterName, value: Standard Included LB Rules and Outbound Rules }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed
+
+    - name: tier2
+      is_primary: false
+      unit: hour
+      default_price: 0.01
+      query:
+        service: Load Balancer
+        product_family: Networking
+        attributes:
+          - { key: productName, value: Load Balancer }
+          - { key: skuName, value: Standard }
+          - { key: meterName, value: Standard Overage LB Rules and Outbound Rules }
+      price_filter:
+        purchase_option: Consumption
+      pricing_model:
+        type: fixed

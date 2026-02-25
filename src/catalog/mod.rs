@@ -57,6 +57,8 @@ pub static AZURE_CATALOG: LazyLock<ResourceCatalog> = LazyLock::new(|| {
             include_str!("../../resources/azure/managed-disk/standard-hdd.yaml"),
             include_str!("../../resources/azure/snapshot.yaml"),
             include_str!("../../resources/azure/public-ip.yaml"),
+            include_str!("../../resources/azure/load-balancer-rules.yaml"),
+            include_str!("../../resources/azure/nat-gateway.yaml"),
         ],
     )
 });
@@ -126,6 +128,8 @@ mod tests {
         assert!(cat.find("managed-disk/standard-hdd/s10").is_ok());
         assert!(cat.find("snapshot").is_ok());
         assert!(cat.find("public-ip").is_ok());
+        assert!(cat.find("load-balancer-rules").is_ok());
+        assert!(cat.find("nat-gateway").is_ok());
     }
 
     #[test]

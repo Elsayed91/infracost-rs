@@ -71,6 +71,22 @@ impl BlockingAzureProvider {
             runtime: self.runtime,
         }
     }
+
+    /// Query NAT Gateway pricing.
+    pub fn nat_gateway(self) -> BlockingAzureNatGatewayBuilder {
+        BlockingAzureNatGatewayBuilder {
+            inner: self.client.azure().nat_gateway(),
+            runtime: self.runtime,
+        }
+    }
+
+    /// Query Load Balancer Rules pricing.
+    pub fn load_balancer_rules(self) -> BlockingAzureLoadBalancerRulesBuilder {
+        BlockingAzureLoadBalancerRulesBuilder {
+            inner: self.client.azure().load_balancer_rules(),
+            runtime: self.runtime,
+        }
+    }
 }
 
 // ============================================================
@@ -93,6 +109,20 @@ blocking_builder! {
 blocking_builder! {
     /// Blocking builder for querying Azure Public IP prices.
     pub struct BlockingAzurePublicIpBuilder wraps crate::providers::azure::PublicIpBuilder {
+    }
+}
+
+blocking_builder! {
+    /// Blocking builder for querying Azure NAT Gateway prices.
+    pub struct BlockingAzureNatGatewayBuilder wraps crate::providers::azure::NatGatewayBuilder {
+        fn data_processed_gb(u64);
+    }
+}
+
+blocking_builder! {
+    /// Blocking builder for querying Azure Load Balancer Rules prices.
+    pub struct BlockingAzureLoadBalancerRulesBuilder wraps crate::providers::azure::LoadBalancerRulesBuilder {
+        fn rule_count(u64);
     }
 }
 
@@ -141,6 +171,34 @@ mod tests {
         // Public IP builder
         let _ = client.azure().public_ip().region("eastus").fetch().unwrap();
         let _ = client.azure().public_ip().fetch_monthly().unwrap();
+
+        // NAT Gateway builder
+        let _ = client
+            .azure()
+            .nat_gateway()
+            .region("Global")
+            .fetch()
+            .unwrap();
+        let _ = client
+            .azure()
+            .nat_gateway()
+            .data_processed_gb(1000)
+            .fetch_monthly()
+            .unwrap();
+
+        // Load Balancer Rules builder
+        let _ = client
+            .azure()
+            .load_balancer_rules()
+            .region("Global")
+            .fetch()
+            .unwrap();
+        let _ = client
+            .azure()
+            .load_balancer_rules()
+            .rule_count(10)
+            .fetch_monthly()
+            .unwrap();
     }
 
     /// Verify override_default works in blocking wrappers.
