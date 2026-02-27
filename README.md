@@ -4,8 +4,7 @@ Rust client for the [Infracost](https://www.infracost.io/) Cloud Pricing API. Ty
 
 ## Extending with Agents
 
-If you want the most accurate pricing, then you need to go through a lot of shenanigans figuring out the correct attribtues and filters, etc.
-A number of skills have been added to facilitate this, simply use `/add-resource` and the agents will run a pipeline that includes experimentation, research and API writing as well as unit/integration testing.
+Accurate pricing requires finding the right API query attributes and filters for each resource — a non-trivial process. To streamline this, run `/add-resource` in Claude Code to launch an agentic pipeline: **research** (IRS CLI exploration across regions) → **implement** (YAML manifest + Rust builder) → **review** (spec compliance) → **test** (integration tests across 7+ regions).
 
 ## Install
 
