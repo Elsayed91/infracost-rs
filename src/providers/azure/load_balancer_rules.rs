@@ -14,8 +14,7 @@ use super::super::{PriceResult, PriceSource};
 // Constants
 // ============================================================
 
-/// Hours in a month (standard billing).
-const HOURS_PER_MONTH: f64 = 730.0;
+use super::super::HOURS_PER_MONTH;
 
 /// Maximum rules in the first tier.
 const TIER1_MAX: u64 = 5;
@@ -189,7 +188,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_balancer_rules_fetch_returns_default_hourly() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .azure()
             .load_balancer_rules()
@@ -205,7 +204,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_balancer_rules_zero_rules() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .azure()
             .load_balancer_rules()
@@ -221,7 +220,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_balancer_rules_three_rules() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .azure()
             .load_balancer_rules()
@@ -238,7 +237,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_balancer_rules_five_rules() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .azure()
             .load_balancer_rules()
@@ -255,7 +254,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_balancer_rules_ten_rules() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .azure()
             .load_balancer_rules()
@@ -274,7 +273,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_balancer_rules_fetch_monthly_requires_rule_count() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client.azure().load_balancer_rules().fetch_monthly().await;
 
         assert!(result.is_err());

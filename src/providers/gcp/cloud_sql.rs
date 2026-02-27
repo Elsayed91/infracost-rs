@@ -9,7 +9,7 @@
 //! # use infracost_rs::Client;
 //! # use infracost_rs::providers::gcp::{CloudSqlEngine, CloudSqlAvailability};
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let price = client.gcp().cloud_sql()
 //!     .engine(CloudSqlEngine::PostgreSql)
 //!     .fetch().await?;
@@ -23,7 +23,7 @@
 //! # use infracost_rs::Client;
 //! # use infracost_rs::providers::gcp::{CloudSqlEngine, CloudSqlAvailability};
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.gcp().cloud_sql()
 //!     .engine(CloudSqlEngine::PostgreSql)
 //!     .availability(CloudSqlAvailability::Regional)
@@ -367,7 +367,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cloud_sql_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .cloud_sql()
@@ -384,7 +384,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cloud_sql_mysql_returns_default() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .cloud_sql()
@@ -401,7 +401,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cloud_sql_fetch_monthly_cpu_and_ram_only() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .cloud_sql()
@@ -429,7 +429,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cloud_sql_fetch_monthly_with_storage() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .cloud_sql()
@@ -459,7 +459,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cloud_sql_fetch_monthly_full() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .cloud_sql()
@@ -494,7 +494,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cloud_sql_requires_cpu_count_for_monthly() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client.gcp().cloud_sql().memory_gb(16).fetch_monthly().await;
 
         assert!(result.is_err());
@@ -502,7 +502,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cloud_sql_requires_memory_gb_for_monthly() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client.gcp().cloud_sql().cpu_count(4).fetch_monthly().await;
 
         assert!(result.is_err());
@@ -510,7 +510,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cloud_sql_string_params() {
-        let builder = CloudSqlBuilder::new(Client::anonymous());
+        let builder = CloudSqlBuilder::new(Client::anonymous().unwrap());
         let builder = builder
             .engine(CloudSqlEngine::SqlServer)
             .availability(CloudSqlAvailability::Regional);

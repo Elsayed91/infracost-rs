@@ -89,9 +89,25 @@ pub use azure::BlockingAzureProvider;
 pub use gcp::BlockingGcpProvider;
 
 use crate::cache::PriceCache;
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::types::{Product, ProductFilter};
+use std::sync::Arc;
 use std::time::Duration;
+
+/// Shared tokio runtime for all blocking clients.
+///
+/// Using a single runtime avoids the overhead of creating one per client instance.
+/// The `expect` here is acceptable: runtime creation failure is an unrecoverable
+/// OS-level error (e.g., out of file descriptors).
+static BLOCKING_RUNTIME: std::sync::LazyLock<Arc<tokio::runtime::Runtime>> =
+    std::sync::LazyLock::new(|| {
+        Arc::new(
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("Failed to create shared blocking runtime"),
+        )
+    });
 
 /// Blocking client for the Infracost Cloud Pricing API.
 ///
@@ -104,42 +120,27 @@ pub struct Client {
 
 impl Client {
     /// Create a new blocking client with an API key.
-    pub fn new(api_key: impl Into<String>) -> Self {
-        Self {
-            inner: crate::Client::new(api_key),
-            runtime: std::sync::Arc::new(
-                tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to create tokio runtime"),
-            ),
-        }
+    pub fn new(api_key: impl Into<String>) -> Result<Self> {
+        Ok(Self {
+            inner: crate::Client::new(api_key)?,
+            runtime: BLOCKING_RUNTIME.clone(),
+        })
     }
 
     /// Create a new blocking client from the `INFRACOST_API_KEY` environment variable.
     pub fn from_env() -> Result<Self> {
         Ok(Self {
             inner: crate::Client::from_env()?,
-            runtime: std::sync::Arc::new(
-                tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .map_err(|e| Error::config(format!("Failed to create runtime: {}", e)))?,
-            ),
+            runtime: BLOCKING_RUNTIME.clone(),
         })
     }
 
     /// Create an anonymous blocking client without an API key.
-    pub fn anonymous() -> Self {
-        Self {
-            inner: crate::Client::anonymous(),
-            runtime: std::sync::Arc::new(
-                tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to create tokio runtime"),
-            ),
-        }
+    pub fn anonymous() -> Result<Self> {
+        Ok(Self {
+            inner: crate::Client::anonymous()?,
+            runtime: BLOCKING_RUNTIME.clone(),
+        })
     }
 
     /// Create a new blocking client builder.
@@ -242,12 +243,7 @@ impl ClientBuilder {
     pub fn build(self) -> Result<Client> {
         Ok(Client {
             inner: self.inner.build()?,
-            runtime: std::sync::Arc::new(
-                tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .map_err(|e| Error::config(format!("Failed to create runtime: {}", e)))?,
-            ),
+            runtime: BLOCKING_RUNTIME.clone(),
         })
     }
 }
@@ -335,13 +331,13 @@ mod tests {
 
     #[test]
     fn test_blocking_client_new() {
-        let client = Client::new("test-key");
+        let client = Client::new("test-key").unwrap();
         assert!(client.inner.has_api_key());
     }
 
     #[test]
     fn test_blocking_client_anonymous() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         assert!(!client.inner.has_api_key());
     }
 

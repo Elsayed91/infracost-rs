@@ -11,7 +11,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let price = client.gcp().bigquery_storage().fetch().await?;
 //! println!("${}/GiB-month", price.price);
 //! # Ok(())
@@ -22,7 +22,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.gcp().bigquery_storage()
 //!     .active_logical_storage_gb(500)
 //!     .long_term_logical_storage_gb(200)
@@ -157,7 +157,7 @@ impl BigQueryStorageBuilder {
     /// ```rust,no_run
     /// # use infracost_rs::Client;
     /// # async fn example() -> infracost_rs::Result<()> {
-    /// let client = Client::new("api-key");
+    /// let client = Client::new("api-key")?;
     /// let cost = client.gcp().bigquery_storage()
     ///     .active_logical_storage_gb(500)
     ///     .long_term_logical_storage_gb(200)
@@ -171,7 +171,7 @@ impl BigQueryStorageBuilder {
     /// ```rust,no_run
     /// # use infracost_rs::Client;
     /// # async fn example() -> infracost_rs::Result<()> {
-    /// let client = Client::new("api-key");
+    /// let client = Client::new("api-key")?;
     /// let cost = client.gcp().bigquery_storage()
     ///     .active_physical_storage_gb(100)
     ///     .long_term_physical_storage_gb(50)
@@ -220,7 +220,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_bigquery_storage_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .bigquery_storage()
@@ -239,7 +239,7 @@ mod tests {
         // Active logical: 500 GiB * $0.023 = $11.50
         // Long-term logical: 200 GiB * $0.016 = $3.20
         // Total: $14.70/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .bigquery_storage()
@@ -260,7 +260,7 @@ mod tests {
         // Active physical: 100 GiB * $0.04 = $4.00
         // Long-term physical: 50 GiB * $0.02 = $1.00
         // Total: $5.00/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .bigquery_storage()
@@ -279,7 +279,7 @@ mod tests {
     #[tokio::test]
     async fn test_bigquery_storage_fetch_monthly_active_logical_only() {
         // Active logical only: 1000 GiB * $0.023 = $23.00
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .bigquery_storage()
@@ -296,7 +296,7 @@ mod tests {
     #[tokio::test]
     async fn test_bigquery_storage_fetch_monthly_no_params_is_zero() {
         // No storage specified = $0/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .bigquery_storage()
@@ -310,7 +310,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_bigquery_storage_override_default() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .bigquery_storage()
@@ -331,7 +331,7 @@ mod tests {
         // Active physical: 50 GiB * $0.04 = $2.00
         // Long-term physical: 25 GiB * $0.02 = $0.50
         // Total: $8.00/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .bigquery_storage()

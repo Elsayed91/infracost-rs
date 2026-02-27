@@ -6,7 +6,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let price = client.aws().rds("db.t3.micro")
 //!     .fetch().await?;
 //! println!("${}/hour", price.price);
@@ -19,7 +19,7 @@
 //! # use infracost_rs::Client;
 //! # use infracost_rs::providers::aws::RdsStorageType;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.aws().rds("db.t3.micro")
 //!     .engine("mysql")
 //!     .storage_type(RdsStorageType::Gp3)
@@ -320,7 +320,7 @@ impl RdsBuilder {
     /// # use infracost_rs::Client;
     /// # use infracost_rs::providers::aws::RdsStorageType;
     /// # async fn example() -> infracost_rs::Result<()> {
-    /// let client = Client::new("api-key");
+    /// let client = Client::new("api-key")?;
     /// let cost = client.aws().rds("db.t3.micro")
     ///     .engine("mysql")
     ///     .storage_type(RdsStorageType::Gp3)
@@ -480,7 +480,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_rds_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .rds("db.t3.micro")
@@ -498,7 +498,7 @@ mod tests {
     async fn test_rds_fetch_monthly_instance_only() {
         // Instance only (no storage specified)
         // $0.017/hr * 730 = $12.41/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .rds("db.t3.micro")
@@ -520,7 +520,7 @@ mod tests {
         // IOPS: baseline 3000, no extra
         // Throughput: baseline 125, no extra
         // Total: $12.41 + $11.50 = $23.91
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .rds("db.t3.micro")
@@ -542,7 +542,7 @@ mod tests {
         // IOPS: 6000 - 3000 baseline = 3000 extra * $0.02 = $60.00
         // Throughput: baseline 125, no extra
         // Total: $12.41 + $11.50 + $60.00 = $83.91
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .rds("db.t3.micro")
@@ -565,7 +565,7 @@ mod tests {
         // IOPS: baseline 3000, no extra
         // Throughput: 250 - 125 baseline = 125 extra * $0.08 = $10.00
         // Total: $12.41 + $11.50 + $10.00 = $33.91
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .rds("db.t3.micro")
@@ -588,7 +588,7 @@ mod tests {
         // IOPS: 6000 - 3000 = 3000 extra * $0.02 = $60.00
         // Throughput: 250 - 125 = 125 extra * $0.08 = $10.00
         // Total: $12.41 + $11.50 + $60.00 + $10.00 = $93.91
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .rds("db.t3.micro")
@@ -610,7 +610,7 @@ mod tests {
         // Instance: $0.017/hr * 730 = $12.41
         // Storage: 100 GB * $0.115 = $11.50
         // Total: $23.91
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .rds("db.t3.micro")
@@ -631,7 +631,7 @@ mod tests {
         // Storage: 100 GB * $0.125 = $12.50
         // IOPS: 1000 * $0.10 = $100.00 (io1 has no baseline)
         // Total: $12.41 + $12.50 + $100.00 = $124.91
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .rds("db.t3.micro")
@@ -652,7 +652,7 @@ mod tests {
         // Instance: $0.017/hr * 730 = $12.41
         // Storage: 100 GB * $0.10 = $10.00
         // Total: $22.41
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .rds("db.t3.micro")
@@ -669,7 +669,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_rds_with_engine_setting() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .rds("db.t3.micro")
@@ -685,7 +685,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_rds_with_multi_az() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .rds("db.t3.micro")
@@ -701,7 +701,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_rds_multi_az_fetch_monthly_uses_doubled_defaults() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
 
         let single_az = client
             .aws()

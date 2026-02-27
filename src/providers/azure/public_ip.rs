@@ -23,7 +23,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_public_ip_builder_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .azure()
             .public_ip()
@@ -39,7 +39,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_public_ip_fetch_monthly() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .azure()
             .public_ip()

@@ -9,7 +9,7 @@
 //! use infracost_rs::providers::gcp::DiskType;
 //!
 //! fn main() -> Result<(), infracost_rs::Error> {
-//!     let client = Client::anonymous();
+//!     let client = Client::anonymous()?;
 //!     let price = client
 //!         .gcp()
 //!         .disk(DiskType::PdSsd)
@@ -213,7 +213,7 @@ mod tests {
     /// the blocking wrappers compile and execute without panicking.
     #[test]
     fn test_blocking_gcp_smoke() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
 
         // Disk builder - test all fetch methods
         let _ = client
@@ -376,7 +376,7 @@ mod tests {
     /// Test one complex case to ensure parameter passing works correctly.
     #[test]
     fn test_blocking_gcp_complex_builder() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
 
         // Test complex builder with multiple parameters
         let result = client

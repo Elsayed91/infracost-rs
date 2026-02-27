@@ -507,7 +507,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_managed_disk_builder_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .azure()
             .managed_disk(ManagedDiskType::PremiumSsd, ManagedDiskSize::P10)
@@ -523,7 +523,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_managed_disk_fetch_monthly() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
 
         // Test that fetch_monthly returns the same result as fetch
         let fetch_result = client

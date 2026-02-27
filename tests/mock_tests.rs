@@ -305,6 +305,152 @@ async fn test_price_filter() {
     assert!((preemptible.usd_f64().unwrap() - 0.0142).abs() < 0.001);
 }
 
+// ============================================================
+// Error Path Tests
+// ============================================================
+
+#[tokio::test]
+async fn test_mock_error_http_400() {
+    let client = MockClient::builder()
+        .with_error(Error::Api {
+            status: 400,
+            message: "Bad Request".into(),
+        })
+        .build();
+
+    let result = client
+        .query_products(ProductFilter::builder().vendor("gcp").build())
+        .await;
+    assert!(matches!(result, Err(Error::Api { status: 400, .. })));
+}
+
+#[tokio::test]
+async fn test_mock_error_http_401() {
+    let client = MockClient::builder()
+        .with_error(Error::Api {
+            status: 401,
+            message: "Unauthorized".into(),
+        })
+        .build();
+
+    let result = client
+        .query_products(ProductFilter::builder().vendor("gcp").build())
+        .await;
+    assert!(matches!(result, Err(Error::Api { status: 401, .. })));
+}
+
+#[tokio::test]
+async fn test_mock_error_http_500() {
+    let client = MockClient::builder()
+        .with_error(Error::Api {
+            status: 500,
+            message: "Internal Server Error".into(),
+        })
+        .build();
+
+    let result = client
+        .query_products(ProductFilter::builder().vendor("gcp").build())
+        .await;
+    assert!(matches!(result, Err(Error::Api { status: 500, .. })));
+}
+
+#[tokio::test]
+async fn test_mock_error_missing_api_key() {
+    let client = MockClient::builder()
+        .with_error(Error::MissingApiKey)
+        .build();
+
+    let result = client.query_products(ProductFilter::default()).await;
+    assert!(matches!(result, Err(Error::MissingApiKey)));
+}
+
+#[tokio::test]
+async fn test_mock_error_no_products() {
+    let client = MockClient::builder().with_error(Error::NoProducts).build();
+
+    let result = client.query_products(ProductFilter::default()).await;
+    assert!(matches!(result, Err(Error::NoProducts)));
+}
+
+#[tokio::test]
+async fn test_mock_error_graphql() {
+    let client = MockClient::builder()
+        .with_error(Error::GraphQL("Query syntax error".into()))
+        .build();
+
+    let result = client.query_products(ProductFilter::default()).await;
+    assert!(matches!(result, Err(Error::GraphQL(_))));
+}
+
+#[tokio::test]
+async fn test_mock_empty_results_no_match() {
+    let client = MockClient::builder()
+        .with_product(
+            MockProduct::new("gcp", "Compute Engine", "us-central1")
+                .sku("pd-ssd")
+                .price(0.170, "GB-month"),
+        )
+        .build();
+
+    // Query for a vendor that doesn't exist
+    let products = client
+        .query_products(ProductFilter::builder().vendor("azure").build())
+        .await
+        .unwrap();
+    assert!(products.is_empty());
+}
+
+#[tokio::test]
+async fn test_mock_query_products_with_key() {
+    let client = MockClient::builder()
+        .with_product(
+            MockProduct::new("gcp", "Compute Engine", "us-central1")
+                .sku("pd-ssd")
+                .price(0.170, "GB-month"),
+        )
+        .build();
+
+    // query_products_with_key ignores the key on mock but should still work
+    let products = client
+        .query_products_with_key(
+            ProductFilter::builder().vendor("gcp").build(),
+            Some("test-key"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(products.len(), 1);
+
+    // Also works with None key
+    let products = client
+        .query_products_with_key(ProductFilter::builder().vendor("gcp").build(), None)
+        .await
+        .unwrap();
+    assert_eq!(products.len(), 1);
+}
+
+#[test]
+fn test_client_from_env_without_env_var() {
+    // Temporarily ensure the env var is not set
+    let original = std::env::var("INFRACOST_API_KEY").ok();
+    // SAFETY: This test is single-threaded and restores the variable afterward.
+    unsafe { std::env::remove_var("INFRACOST_API_KEY") };
+
+    let result = infracost_rs::Client::from_env();
+    assert!(matches!(result, Err(Error::MissingApiKey)));
+
+    // Restore if it was set
+    if let Some(val) = original {
+        // SAFETY: Restoring original value.
+        unsafe { std::env::set_var("INFRACOST_API_KEY", val) };
+    }
+}
+
+#[test]
+fn test_client_builder_no_key_succeeds_as_anonymous() {
+    let client = infracost_rs::Client::builder().build().unwrap();
+    assert!(!client.has_api_key());
+}
+
 #[cfg(feature = "cache-memory")]
 mod cache_tests {
     use infracost_rs::{Client, MemoryCache, PriceCache};

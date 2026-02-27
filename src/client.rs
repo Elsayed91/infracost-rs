@@ -58,8 +58,8 @@ struct ClientInner {
 ///
 /// # async fn example() -> Result<(), infracost_rs::Error> {
 /// let client = Client::from_env()?;        // from INFRACOST_API_KEY
-/// let client = Client::new("ico-xxx");     // explicit key
-/// let client = Client::anonymous();        // per-request key
+/// let client = Client::new("ico-xxx")?;    // explicit key
+/// let client = Client::anonymous()?;       // per-request key
 ///
 /// let products = client
 ///     .products()
@@ -89,20 +89,20 @@ impl Client {
     ///
     /// The API key is stored in the client and used for all requests
     /// unless overridden per-request.
-    pub fn new(api_key: impl Into<String>) -> Self {
-        Self {
+    pub fn new(api_key: impl Into<String>) -> Result<Self> {
+        Ok(Self {
             inner: Arc::new(ClientInner {
                 http: reqwest::Client::builder()
                     .timeout(DEFAULT_TIMEOUT)
                     .build()
-                    .expect("Failed to build HTTP client"),
+                    .map_err(|e| Error::config(format!("Failed to build HTTP client: {}", e)))?,
                 api_key: Some(api_key.into()),
                 endpoint: DEFAULT_ENDPOINT.to_string(),
                 error_on_fallback: false,
                 cache: None,
                 cache_ttl: DEFAULT_CACHE_TTL,
             }),
-        }
+        })
     }
 
     /// Create a new client from the `INFRACOST_API_KEY` environment variable.
@@ -110,26 +110,26 @@ impl Client {
     /// Returns an error if the environment variable is not set.
     pub fn from_env() -> Result<Self> {
         let api_key = env::var("INFRACOST_API_KEY").map_err(|_| Error::MissingApiKey)?;
-        Ok(Self::new(api_key))
+        Self::new(api_key)
     }
 
     /// Create an anonymous client without an API key.
     ///
     /// You must provide an API key per-request when using this client.
-    pub fn anonymous() -> Self {
-        Self {
+    pub fn anonymous() -> Result<Self> {
+        Ok(Self {
             inner: Arc::new(ClientInner {
                 http: reqwest::Client::builder()
                     .timeout(DEFAULT_TIMEOUT)
                     .build()
-                    .expect("Failed to build HTTP client"),
+                    .map_err(|e| Error::config(format!("Failed to build HTTP client: {}", e)))?,
                 api_key: None,
                 endpoint: DEFAULT_ENDPOINT.to_string(),
                 error_on_fallback: false,
                 cache: None,
                 cache_ttl: DEFAULT_CACHE_TTL,
             }),
-        }
+        })
     }
 
     /// Create a new client builder for advanced configuration.
@@ -169,7 +169,7 @@ impl Client {
     /// use infracost_rs::providers::gcp::DiskType;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let price = client
     ///     .gcp()
     ///     .disk(DiskType::PdSsd)
@@ -192,7 +192,7 @@ impl Client {
     /// use infracost_rs::providers::aws::EbsType;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let price = client
     ///     .aws()
     ///     .ebs(EbsType::Gp3)
@@ -215,7 +215,7 @@ impl Client {
     /// use infracost_rs::providers::azure::{ManagedDiskType, ManagedDiskSize};
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let price = client
     ///     .azure()
     ///     .managed_disk(ManagedDiskType::PremiumSsd, ManagedDiskSize::P10)
@@ -495,14 +495,14 @@ mod tests {
 
     #[test]
     fn test_client_new() {
-        let client = Client::new("test-key");
+        let client = Client::new("test-key").unwrap();
         assert!(client.has_api_key());
         assert_eq!(client.endpoint(), DEFAULT_ENDPOINT);
     }
 
     #[test]
     fn test_client_anonymous() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         assert!(!client.has_api_key());
     }
 
@@ -521,10 +521,10 @@ mod tests {
 
     #[test]
     fn test_client_error_on_fallback_default() {
-        let client = Client::new("test-key");
+        let client = Client::new("test-key").unwrap();
         assert!(!client.error_on_fallback());
 
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         assert!(!client.error_on_fallback());
     }
 

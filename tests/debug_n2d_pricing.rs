@@ -7,7 +7,7 @@ use std::env;
 #[ignore]
 async fn debug_n2d_description_filters() {
     let api_key = env::var("INFRACOST_API_KEY").expect("INFRACOST_API_KEY must be set");
-    let client = Client::new(api_key);
+    let client = Client::new(api_key).unwrap();
 
     println!("\n=== Testing N2D On-Demand ===");
     let n2d_ondemand_cpu = client

@@ -6,7 +6,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let price = client.aws().ebs("gp3").fetch().await?;
 //! println!("${}/GB-month", price.price);
 //! # Ok(())
@@ -17,7 +17,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.aws().ebs("gp3")
 //!     .size_gb(500)
 //!     .iops(6000)           // 3000 extra billable (baseline is 3000)
@@ -221,7 +221,7 @@ impl EbsBuilder {
     /// ```rust,no_run
     /// # use infracost_rs::Client;
     /// # async fn example() -> infracost_rs::Result<()> {
-    /// let client = Client::new("api-key");
+    /// let client = Client::new("api-key")?;
     /// let cost = client.aws().ebs("gp3")
     ///     .size_gb(500)
     ///     .iops(6000)
@@ -297,7 +297,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ebs_builder_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Gp3)
@@ -313,7 +313,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ebs_builder_string_type() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs("gp3")
@@ -329,7 +329,7 @@ mod tests {
     async fn test_gp3_fetch_monthly_storage_only() {
         // 500 GB gp3 with baseline IOPS/throughput
         // Cost = 500 * $0.08 = $40/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Gp3)
@@ -346,7 +346,7 @@ mod tests {
     async fn test_gp3_fetch_monthly_with_extra_iops() {
         // 500 GB gp3 with 6000 IOPS (3000 extra billable)
         // Cost = (500 * $0.08) + (3000 * $0.005) = $40 + $15 = $55/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Gp3)
@@ -364,7 +364,7 @@ mod tests {
     async fn test_gp3_fetch_monthly_with_extra_throughput() {
         // 500 GB gp3 with 250 MiBps throughput (125 extra billable)
         // Cost = (500 * $0.08) + (125 * $0.04) = $40 + $5 = $45/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Gp3)
@@ -383,7 +383,7 @@ mod tests {
         // 500 GB gp3 with 6000 IOPS and 250 MiBps throughput
         // Cost = (500 * $0.08) + (3000 * $0.005) + (125 * $0.04)
         //      = $40 + $15 + $5 = $60/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Gp3)
@@ -402,7 +402,7 @@ mod tests {
     async fn test_gp3_fetch_monthly_baseline_iops_no_charge() {
         // 500 GB gp3 with exactly baseline IOPS (3000) - no extra charge
         // Cost = 500 * $0.08 = $40/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Gp3)
@@ -419,7 +419,7 @@ mod tests {
     async fn test_gp2_fetch_monthly_storage_only() {
         // gp2 has no provisioned IOPS/throughput - storage only
         // 500 GB * $0.10 = $50/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Gp2)
@@ -434,7 +434,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_monthly_requires_size_gb() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Gp3)
@@ -467,7 +467,7 @@ mod tests {
     async fn test_io2_fetch_monthly_storage_only() {
         // 100 GB io2 with no provisioned IOPS (baseline is 0 for io2)
         // Cost = 100 * $0.125 = $12.50/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Io2)
@@ -485,7 +485,7 @@ mod tests {
         // 100 GB io2 with 10,000 IOPS (tier 1)
         // Cost = (100 * $0.125) + (10,000 * $0.065)
         //      = $12.5 + $650 = $662.5/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Io2)
@@ -504,7 +504,7 @@ mod tests {
         // 100 GB io2 with 50,000 IOPS (spans tier 1 and tier 2)
         // Cost = (100 * $0.125) + (32,000 * $0.065) + (18,000 * $0.046)
         //      = $12.5 + $2,080 + $828 = $2,920.5/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Io2)
@@ -523,7 +523,7 @@ mod tests {
         // 100 GB io2 with 100,000 IOPS (spans all 3 tiers)
         // Cost = (100 * $0.125) + (32,000 * $0.065) + (32,000 * $0.046) + (36,000 * $0.032)
         //      = $12.5 + $2,080 + $1,472 + $1,152 = $4,716.5/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Io2)
@@ -542,7 +542,7 @@ mod tests {
         // Verify io2 has no baseline - all IOPS are billed
         // 100 GB io2 with 1000 IOPS
         // Cost = (100 * $0.125) + (1000 * $0.065) = $12.5 + $65 = $77.5/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Io2)
@@ -561,7 +561,7 @@ mod tests {
         // io2 does not support throughput provisioning - should be ignored
         // 100 GB io2 with 10,000 IOPS and throughput (throughput should be ignored)
         // Cost = (100 * $0.125) + (10,000 * $0.065) = $662.5/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ebs(EbsType::Io2)

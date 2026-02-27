@@ -8,7 +8,7 @@
 //! # use infracost_rs::Client;
 //! # use infracost_rs::providers::gcp::BackendServiceTier;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let price = client.gcp().backend_service(BackendServiceTier::Premium).fetch().await?;
 //! println!("${}/GiB", price.price);
 //! # Ok(())
@@ -20,7 +20,7 @@
 //! # use infracost_rs::Client;
 //! # use infracost_rs::providers::gcp::BackendServiceTier;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.gcp().backend_service(BackendServiceTier::Premium)
 //!     .data_processed_gb(1000)  // 1000 GB of data processed per month
 //!     .fetch_monthly().await?;
@@ -34,7 +34,7 @@
 //! # use infracost_rs::Client;
 //! # use infracost_rs::providers::gcp::BackendServiceTier;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.gcp().backend_service(BackendServiceTier::Premium)
 //!     .forwarding_rules(1)
 //!     .data_processed_gb(1000)
@@ -148,7 +148,7 @@ impl BackendServiceBuilder {
     /// # use infracost_rs::Client;
     /// # use infracost_rs::providers::gcp::BackendServiceTier;
     /// # async fn example() -> infracost_rs::Result<()> {
-    /// let client = Client::new("api-key");
+    /// let client = Client::new("api-key")?;
     /// let cost = client.gcp().backend_service(BackendServiceTier::Premium)
     ///     .forwarding_rules(1)
     ///     .data_processed_gb(1000)
@@ -192,7 +192,7 @@ impl BackendServiceBuilder {
     /// # use infracost_rs::Client;
     /// # use infracost_rs::providers::gcp::BackendServiceTier;
     /// # async fn example() -> infracost_rs::Result<()> {
-    /// let client = Client::new("api-key");
+    /// let client = Client::new("api-key")?;
     /// let cost = client.gcp().backend_service(BackendServiceTier::Premium)
     ///     .region("us-central1")
     ///     .forwarding_rules(1)
@@ -233,7 +233,7 @@ impl BackendServiceBuilder {
                 None,
             )
             .await?;
-            result.price += fr_result.price * 730.0 * count as f64;
+            result.price += fr_result.price * super::super::HOURS_PER_MONTH * count as f64;
             if !fr_result.is_from_api() && result.source == PriceSource::Api {
                 result.source = PriceSource::Default;
             }
@@ -249,7 +249,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_backend_service_premium_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .backend_service(BackendServiceTier::Premium)
@@ -265,7 +265,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_backend_service_standard_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .backend_service(BackendServiceTier::Standard)
@@ -283,7 +283,7 @@ mod tests {
     async fn test_backend_service_premium_fetch_monthly() {
         // Premium backend service with 1000 GB of data processed
         // Cost = $0.008 * 1000 = $8.00/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .backend_service(BackendServiceTier::Premium)
@@ -302,7 +302,7 @@ mod tests {
     async fn test_backend_service_standard_fetch_monthly() {
         // Standard backend service with 1000 GB of data processed
         // Cost = $0.008 * 1000 = $8.00/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .backend_service(BackendServiceTier::Standard)
@@ -321,7 +321,7 @@ mod tests {
     async fn test_backend_service_fetch_monthly_no_data_defaults_to_zero() {
         // Backend service without data_processed_gb defaults to 0
         // Cost = $0.008 * 0 = $0.00/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .backend_service(BackendServiceTier::Premium)
@@ -339,7 +339,7 @@ mod tests {
     async fn test_backend_service_fetch_monthly_zero_data() {
         // Explicitly setting 0 GB
         // Cost = $0.008 * 0 = $0.00/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .backend_service(BackendServiceTier::Premium)
@@ -358,7 +358,7 @@ mod tests {
     async fn test_backend_service_with_forwarding_rule() {
         // 1 forwarding rule, no data
         // Cost = ($0.025 * 730) + ($0.008 * 0) = $18.25/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .backend_service(BackendServiceTier::Premium)
@@ -377,7 +377,7 @@ mod tests {
     async fn test_backend_service_with_forwarding_rule_and_data() {
         // 1 forwarding rule + 1000 GB data
         // Cost = ($0.025 * 730) + ($0.008 * 1000) = $18.25 + $8.00 = $26.25/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .backend_service(BackendServiceTier::Premium)
@@ -397,7 +397,7 @@ mod tests {
     async fn test_backend_service_with_multiple_forwarding_rules() {
         // 3 forwarding rules + 500 GB data
         // Cost = ($0.025 * 730 * 3) + ($0.008 * 500) = $54.75 + $4.00 = $58.75/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .backend_service(BackendServiceTier::Premium)
@@ -440,7 +440,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_backend_service_override_default() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .backend_service(BackendServiceTier::Premium)

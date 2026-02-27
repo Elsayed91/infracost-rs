@@ -7,7 +7,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let price = client.gcp().compute_instance()
 //!     .machine_type("n2-standard-4")
 //!     .fetch().await?;
@@ -20,7 +20,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.gcp().compute_instance()
 //!     .machine_type("n2-standard-4")
 //!     .fetch_monthly().await?;
@@ -33,7 +33,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.gcp().compute_instance()
 //!     .machine_family("n2")
 //!     .cpu_cores(4)
@@ -920,7 +920,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_n2_standard_4_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .compute_instance()
@@ -937,7 +937,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_n2_standard_4_fetch_monthly() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .compute_instance()
@@ -957,7 +957,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_e2_medium_fetch_monthly() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .compute_instance()
@@ -967,16 +967,14 @@ mod tests {
             .unwrap();
 
         assert!(result.is_from_default());
-        // TODO: Fix default price handling for E2 when no API key is available
-        // Currently uses N2 defaults from YAML. With API key, this works correctly.
-        // E2 medium: 1 core, 4 GiB
-        // let expected = (1.0 * 0.02181159 * 730.0) + (4.0 * 0.00292353 * 730.0);
-        // assert!((result.price - expected).abs() < 0.01);
+        // E2 medium: 1 core, 4 GiB (uses E2-specific defaults from get_default_cpu_price/get_default_ram_price)
+        let expected = (1.0 * 0.02181159 * 730.0) + (4.0 * 0.00292353 * 730.0);
+        assert!((result.price - expected).abs() < 0.01);
     }
 
     #[tokio::test]
     async fn test_custom_machine_type() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .compute_instance()
@@ -993,7 +991,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_manual_specs() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .compute_instance()
@@ -1011,7 +1009,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_spot_pricing() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .compute_instance()
@@ -1028,7 +1026,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_spot_fetch_monthly_uses_discounted_defaults() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
 
         // On-demand monthly cost for n2-standard-4 (4 CPU, 16 GiB)
         let ondemand = client
@@ -1061,7 +1059,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cud_1yr_fetch_monthly_uses_discounted_defaults() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
 
         let ondemand = client
             .gcp()
@@ -1090,7 +1088,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cud_3yr_fetch_monthly_uses_discounted_defaults() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
 
         let ondemand = client
             .gcp()

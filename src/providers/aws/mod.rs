@@ -7,7 +7,7 @@
 //! use infracost_rs::providers::aws::EbsType;
 //!
 //! # async fn example() -> Result<(), infracost_rs::Error> {
-//! let client = Client::anonymous();
+//! let client = Client::anonymous()?;
 //!
 //! let price = client
 //!     .aws()
@@ -57,7 +57,7 @@ impl AwsProvider {
     /// use infracost_rs::providers::aws::EbsType;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let price = client
     ///     .aws()
     ///     .ebs(EbsType::Gp3)

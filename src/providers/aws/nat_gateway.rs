@@ -25,7 +25,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_nat_gateway_builder_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .nat_gateway()
@@ -43,7 +43,7 @@ mod tests {
     async fn test_nat_gateway_fetch_monthly_with_data_processing() {
         // NAT Gateway with 1000 GB data processed per month
         // Cost = ($0.045 * 730) + ($0.045 * 1000) = $32.85 + $45.00 = $77.85/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .nat_gateway()
@@ -62,7 +62,7 @@ mod tests {
     async fn test_nat_gateway_fetch_monthly_hourly_only() {
         // NAT Gateway with no data processing specified
         // Cost = $0.045 * 730 = $32.85/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .nat_gateway()
@@ -80,7 +80,7 @@ mod tests {
     async fn test_nat_gateway_fetch_monthly_zero_data() {
         // NAT Gateway with 0 GB data processed
         // Cost = ($0.045 * 730) + ($0.045 * 0) = $32.85/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .nat_gateway()

@@ -6,7 +6,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let price = client.aws().ec2_instance("t3.micro")
 //!     .fetch().await?;
 //! println!("${}/hour", price.price);
@@ -18,7 +18,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.aws().ec2_instance("t3.micro")
 //!     .fetch_monthly().await?;
 //! println!("${}/month", cost.price);
@@ -30,7 +30,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.aws().ec2_instance("m5.xlarge")
 //!     .operating_system("Windows")
 //!     .fetch_monthly().await?;
@@ -183,7 +183,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ec2_instance_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ec2_instance("t3.micro")
@@ -199,7 +199,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ec2_instance_fetch_monthly() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ec2_instance("t3.micro")
@@ -217,7 +217,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ec2_instance_with_operating_system() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ec2_instance("t3.micro")
@@ -233,7 +233,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ec2_instance_with_tenancy() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .ec2_instance("t3.micro")

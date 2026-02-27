@@ -6,7 +6,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let price = client.aws().alb().fetch().await?;
 //! println!("${}/hour", price.price);
 //! # Ok(())
@@ -17,7 +17,7 @@
 //! ```rust,no_run
 //! # use infracost_rs::Client;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.aws().alb()
 //!     .lcu_hours(10000)  // 10,000 LCU-hours per month
 //!     .fetch_monthly().await?;
@@ -51,7 +51,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_alb_builder_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .alb()
@@ -69,7 +69,7 @@ mod tests {
     async fn test_alb_fetch_monthly_hourly_only() {
         // ALB with no LCU usage specified - hourly cost only
         // Cost = $0.0225/hour * 730 hours = $16.425/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .alb()
@@ -88,7 +88,7 @@ mod tests {
         // ALB with 10,000 LCU-hours per month
         // Cost = ($0.0225 * 730) + ($0.008 * 10000)
         //      = $16.425 + $80 = $96.425/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .alb()
@@ -108,7 +108,7 @@ mod tests {
         // ALB with minimal LCU usage (730 LCU-hours = 1 LCU for whole month)
         // Cost = ($0.0225 * 730) + ($0.008 * 730)
         //      = $16.425 + $5.84 = $22.265/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .alb()
@@ -126,7 +126,7 @@ mod tests {
     async fn test_alb_fetch_monthly_zero_lcu() {
         // ALB with zero LCU-hours specified (same as not specifying)
         // Cost = $0.0225 * 730 = $16.425/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .alb()

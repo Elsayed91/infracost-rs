@@ -116,7 +116,7 @@ macro_rules! resource_builder {
 
                 if unit_result.unit == "hour" {
                     Ok(crate::providers::PriceResult {
-                        price: unit_result.price * 730.0,
+                        price: unit_result.price * crate::providers::HOURS_PER_MONTH,
                         unit: "month".to_string(),
                         source: unit_result.source,
                     })

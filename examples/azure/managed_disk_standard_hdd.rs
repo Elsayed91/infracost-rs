@@ -10,10 +10,10 @@ use infracost_rs::providers::azure::ManagedDiskSize;
 #[tokio::main]
 async fn main() -> infracost_rs::Result<()> {
     let client = match std::env::var("INFRACOST_API_KEY") {
-        Ok(key) => Client::new(key),
+        Ok(key) => Client::new(key)?,
         Err(_) => {
             println!("(No API key — using built-in defaults)\n");
-            Client::anonymous()
+            Client::anonymous()?
         }
     };
 

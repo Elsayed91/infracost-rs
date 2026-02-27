@@ -7,7 +7,7 @@
 //! use infracost_rs::providers::azure::{ManagedDiskType, ManagedDiskSize};
 //!
 //! fn example() -> Result<(), infracost_rs::Error> {
-//!     let client = Client::anonymous();
+//!     let client = Client::anonymous()?;
 //!
 //!     // Query managed disk pricing (P10 Premium SSD)
 //!     let price = client
@@ -139,7 +139,7 @@ mod tests {
     /// Detailed assertions are in the async builder tests.
     #[test]
     fn test_blocking_azure_smoke() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
 
         // Managed Disk builder - test all fetch methods
         let _ = client
@@ -204,7 +204,7 @@ mod tests {
     /// Verify override_default works in blocking wrappers.
     #[test]
     fn test_blocking_azure_override() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .azure()
             .snapshot()

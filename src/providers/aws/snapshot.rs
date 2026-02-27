@@ -22,7 +22,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_snapshot_builder_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .snapshot()
@@ -38,7 +38,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_snapshot_fetch_monthly() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .snapshot()
@@ -55,7 +55,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_snapshot_fetch_monthly_requires_size() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .aws()
             .snapshot()

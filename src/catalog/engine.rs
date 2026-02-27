@@ -220,7 +220,7 @@ impl PricingEngine {
                 Ok(PriceResult::from_api(price, unit))
             }
             Ok(_) if !client.error_on_fallback() => {
-                tracing::debug!(
+                tracing::warn!(
                     target: "infracost",
                     component = %component.name,
                     region = %region,
@@ -231,7 +231,7 @@ impl PricingEngine {
                 Ok(PriceResult::from_default(default_price, unit))
             }
             Err(ref e) if !client.error_on_fallback() => {
-                tracing::debug!(
+                tracing::warn!(
                     target: "infracost",
                     component = %component.name,
                     region = %region,
@@ -366,7 +366,7 @@ impl PricingEngine {
                 Self::calculate_tiered_cost(qty, tiers)
             }
 
-            PricingModelDef::HourlyToMonthly => price * 730.0,
+            PricingModelDef::HourlyToMonthly => price * crate::providers::HOURS_PER_MONTH,
 
             PricingModelDef::Fixed => price,
         }

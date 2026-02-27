@@ -7,7 +7,7 @@
 //! use infracost_rs::providers::azure::{ManagedDiskType, ManagedDiskSize};
 //!
 //! # async fn example() -> Result<(), infracost_rs::Error> {
-//! let client = Client::anonymous();
+//! let client = Client::anonymous()?;
 //!
 //! // Query managed disk pricing (P10 Premium SSD)
 //! let price = client
@@ -73,7 +73,7 @@ impl AzureProvider {
     /// use infracost_rs::providers::azure::{ManagedDiskType, ManagedDiskSize};
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let price = client
     ///     .azure()
     ///     .managed_disk(ManagedDiskType::PremiumSsd, ManagedDiskSize::P10)
@@ -101,7 +101,7 @@ impl AzureProvider {
     /// use infracost_rs::Client;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let price = client
     ///     .azure()
     ///     .snapshot()
@@ -125,7 +125,7 @@ impl AzureProvider {
     /// use infracost_rs::Client;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let price = client
     ///     .azure()
     ///     .public_ip()
@@ -151,7 +151,7 @@ impl AzureProvider {
     /// use infracost_rs::Client;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let monthly = client
     ///     .azure()
     ///     .load_balancer_rules()
@@ -176,7 +176,7 @@ impl AzureProvider {
     /// use infracost_rs::Client;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let monthly = client
     ///     .azure()
     ///     .nat_gateway()

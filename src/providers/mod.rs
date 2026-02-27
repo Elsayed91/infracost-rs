@@ -12,7 +12,7 @@
 //! use infracost_rs::providers::azure::{ManagedDiskType, ManagedDiskSize};
 //!
 //! # async fn example() -> Result<(), infracost_rs::Error> {
-//! let client = Client::anonymous();
+//! let client = Client::anonymous()?;
 //!
 //! // GCP - returns built-in default when no API key
 //! let price = client
@@ -45,6 +45,9 @@ pub mod aws;
 pub mod azure;
 pub mod gcp;
 pub(crate) mod macros;
+
+/// Hours in a standard billing month (730 = 365 days × 24 hours / 12 months).
+pub const HOURS_PER_MONTH: f64 = 730.0;
 
 /// Result of a price query, including the source of the price.
 #[derive(Debug, Clone)]

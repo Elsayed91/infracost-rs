@@ -29,7 +29,7 @@
 //! use infracost_rs::providers::gcp::DiskType;
 //!
 //! # async fn example() -> Result<(), infracost_rs::Error> {
-//! let client = Client::anonymous();
+//! let client = Client::anonymous()?;
 //!
 //! // Returns built-in default ($0.17/GB-month) when no API key
 //! let price = client
@@ -94,7 +94,7 @@ pub use cache::RedisCache;
 pub use cache::SqliteCache;
 pub use client::{Client, ClientBuilder, DEFAULT_ENDPOINT, DEFAULT_TIMEOUT, PricingClient};
 pub use error::{Error, Result};
-pub use providers::{PriceResult, PriceSource};
+pub use providers::{HOURS_PER_MONTH, PriceResult, PriceSource};
 pub use query::ProductQueryBuilder;
 pub use types::{
     Attribute, AttributeFilter, Price, PriceFilter, Product, ProductFilter, ProductFilterBuilder,

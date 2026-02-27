@@ -134,7 +134,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create client
     let client = match &cli.api_key {
-        Some(key) => Client::new(key),
+        Some(key) => Client::new(key)?,
         None => Client::from_env().map_err(|_| {
             anyhow::anyhow!(
                 "API key not provided. Use --api-key or set INFRACOST_API_KEY environment variable"

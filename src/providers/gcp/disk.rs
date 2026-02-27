@@ -7,7 +7,7 @@
 //! # use infracost_rs::Client;
 //! # use infracost_rs::providers::gcp::DiskType;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let price = client.gcp().disk(DiskType::PdSsd).fetch().await?;
 //! println!("${}/GB-month", price.price);
 //! # Ok(())
@@ -19,7 +19,7 @@
 //! # use infracost_rs::Client;
 //! # use infracost_rs::providers::gcp::DiskType;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.gcp().disk(DiskType::PdExtreme)
 //!     .size_gb(500)
 //!     .iops(15000)  // Provisioned IOPS for pd-extreme
@@ -334,7 +334,7 @@ impl DiskBuilder {
     /// # use infracost_rs::Client;
     /// # use infracost_rs::providers::gcp::DiskType;
     /// # async fn example() -> infracost_rs::Result<()> {
-    /// let client = Client::new("api-key");
+    /// let client = Client::new("api-key")?;
     /// let cost = client.gcp().disk(DiskType::PdExtreme)
     ///     .size_gb(500)
     ///     .iops(15000)
@@ -349,7 +349,7 @@ impl DiskBuilder {
     /// # use infracost_rs::Client;
     /// # use infracost_rs::providers::gcp::DiskType;
     /// # async fn example() -> infracost_rs::Result<()> {
-    /// let client = Client::new("api-key");
+    /// let client = Client::new("api-key")?;
     /// let cost = client.gcp().disk(DiskType::HyperdiskThroughput)
     ///     .size_gb(1000)
     ///     .throughput(500)  // 500 MiB/s
@@ -425,7 +425,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_builder_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk(DiskType::PdSsd)
@@ -441,7 +441,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_builder_override_default() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk(DiskType::PdSsd)
@@ -457,7 +457,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_builder_string_type() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk("pd-ssd")
@@ -477,7 +477,7 @@ mod tests {
     async fn test_pd_extreme_fetch_monthly_storage_only() {
         // 500 GB pd-extreme with no provisioned IOPS
         // Cost = 500 * $0.125 = $62.5/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk(DiskType::PdExtreme)
@@ -495,7 +495,7 @@ mod tests {
         // 500 GB pd-extreme with 15000 provisioned IOPS
         // Cost = (500 * $0.125) + (15000 * $0.065)
         //      = $62.5 + $975 = $1037.5/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk(DiskType::PdExtreme)
@@ -514,7 +514,7 @@ mod tests {
         // 100 GB pd-extreme with 1000 provisioned IOPS
         // Cost = (100 * $0.125) + (1000 * $0.065)
         //      = $12.5 + $65 = $77.5/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk(DiskType::PdExtreme)
@@ -532,7 +532,7 @@ mod tests {
     async fn test_pd_ssd_fetch_monthly_storage_only() {
         // pd-ssd has no provisioned IOPS - storage only
         // 500 GB * $0.17 = $85/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk(DiskType::PdSsd)
@@ -549,7 +549,7 @@ mod tests {
     async fn test_pd_ssd_iops_ignored() {
         // pd-ssd does not support IOPS - should be ignored
         // 500 GB * $0.17 = $85/month (IOPS ignored)
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk(DiskType::PdSsd)
@@ -567,7 +567,7 @@ mod tests {
     async fn test_pd_balanced_fetch_monthly_storage_only() {
         // pd-balanced has no provisioned IOPS - storage only
         // 500 GB * $0.10 = $50/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk(DiskType::PdBalanced)
@@ -584,7 +584,7 @@ mod tests {
     async fn test_pd_balanced_iops_ignored() {
         // pd-balanced does not support IOPS - should be ignored
         // 500 GB * $0.10 = $50/month (IOPS ignored)
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk(DiskType::PdBalanced)
@@ -602,7 +602,7 @@ mod tests {
     async fn test_pd_standard_fetch_monthly_storage_only() {
         // pd-standard has no provisioned IOPS - storage only
         // 500 GB * $0.04 = $20/month
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk(DiskType::PdStandard)
@@ -619,7 +619,7 @@ mod tests {
     async fn test_pd_standard_iops_ignored() {
         // pd-standard does not support IOPS - should be ignored
         // 500 GB * $0.04 = $20/month (IOPS ignored)
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk(DiskType::PdStandard)
@@ -635,7 +635,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_monthly_requires_size_gb() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .disk(DiskType::PdExtreme)
@@ -688,7 +688,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_regional_disk_doubles_price() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let zonal = client
             .gcp()
             .disk(DiskType::PdSsd)
@@ -711,7 +711,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_regional_disk_monthly_doubles_price() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let zonal = client
             .gcp()
             .disk(DiskType::PdSsd)

@@ -7,7 +7,7 @@
 //! # use infracost_rs::Client;
 //! # use infracost_rs::providers::gcp::SnapshotType;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let price = client.gcp().snapshot(SnapshotType::Standard).fetch().await?;
 //! println!("${}/GiB-month", price.price);
 //! # Ok(())
@@ -19,7 +19,7 @@
 //! # use infracost_rs::Client;
 //! # use infracost_rs::providers::gcp::SnapshotType;
 //! # async fn example() -> infracost_rs::Result<()> {
-//! let client = Client::new("api-key");
+//! let client = Client::new("api-key")?;
 //! let cost = client.gcp().snapshot(SnapshotType::Archive)
 //!     .size_gb(500)
 //!     .retrieval_size_gb(100)  // Optional: expected monthly retrieval volume
@@ -232,7 +232,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_standard_snapshot_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .snapshot(SnapshotType::Standard)
@@ -252,7 +252,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_standard_snapshot_fetch_monthly() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .snapshot(SnapshotType::Standard)
@@ -273,7 +273,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_standard_snapshot_fetch_monthly_requires_size() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .snapshot(SnapshotType::Standard)
@@ -287,7 +287,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_standard_snapshot_override_default() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .snapshot(SnapshotType::Standard)
@@ -306,7 +306,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_standard_snapshot_string_type() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .snapshot("standard")
@@ -328,7 +328,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_archive_snapshot_returns_default_without_api_key() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .snapshot(SnapshotType::Archive)
@@ -350,7 +350,7 @@ mod tests {
     async fn test_archive_snapshot_fetch_monthly_storage_only() {
         // 500 GB archive snapshot, no retrieval
         // Cost = 0.019 x 500 = 9.50
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .snapshot(SnapshotType::Archive)
@@ -372,7 +372,7 @@ mod tests {
     async fn test_archive_snapshot_fetch_monthly_with_retrieval() {
         // 500 GB archive snapshot with 100 GB retrieval
         // Cost = (0.019 x 500) + (0.019 x 100) = 9.50 + 1.90 = 11.40
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .snapshot(SnapshotType::Archive)
@@ -393,7 +393,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_archive_snapshot_fetch_monthly_requires_size() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .snapshot(SnapshotType::Archive)
@@ -407,7 +407,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_archive_snapshot_string_type() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let result = client
             .gcp()
             .snapshot("archive")
@@ -429,7 +429,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_archive_cheaper_than_standard() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
 
         let standard = client
             .gcp()

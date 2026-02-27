@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_query_builder_filter_construction() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let builder = client
             .products()
             .vendor("gcp")
@@ -157,7 +157,7 @@ mod tests {
 
     #[test]
     fn test_query_builder_api_key_override() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
         let builder = client.products().api_key("override-key");
         assert_eq!(builder.api_key_override.as_deref(), Some("override-key"));
     }

@@ -7,7 +7,7 @@
 //! use infracost_rs::providers::gcp::DiskType;
 //!
 //! # async fn example() -> Result<(), infracost_rs::Error> {
-//! let client = Client::anonymous();
+//! let client = Client::anonymous()?;
 //!
 //! let price = client
 //!     .gcp()
@@ -61,7 +61,7 @@ impl GcpProvider {
     /// use infracost_rs::providers::gcp::DiskType;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let price = client
     ///     .gcp()
     ///     .disk(DiskType::PdSsd)
@@ -86,7 +86,7 @@ impl GcpProvider {
     /// use infracost_rs::providers::gcp::SnapshotType;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let price = client
     ///     .gcp()
     ///     .snapshot(SnapshotType::Standard)
@@ -136,7 +136,7 @@ impl GcpProvider {
     /// use infracost_rs::providers::gcp::BackendServiceTier;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let price = client
     ///     .gcp()
     ///     .backend_service(BackendServiceTier::Premium)
@@ -163,7 +163,7 @@ impl GcpProvider {
     /// use infracost_rs::providers::gcp::{CloudSqlEngine, CloudSqlAvailability};
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let cost = client
     ///     .gcp()
     ///     .cloud_sql()
@@ -195,7 +195,7 @@ impl GcpProvider {
     /// use infracost_rs::Client;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let cost = client
     ///     .gcp()
     ///     .bigquery_storage()
@@ -221,7 +221,7 @@ impl GcpProvider {
     /// use infracost_rs::Client;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let cost = client
     ///     .gcp()
     ///     .compute_instance()
@@ -238,7 +238,7 @@ impl GcpProvider {
     /// use infracost_rs::Client;
     ///
     /// # async fn example() -> Result<(), infracost_rs::Error> {
-    /// let client = Client::anonymous();
+    /// let client = Client::anonymous()?;
     /// let cost = client
     ///     .gcp()
     ///     .compute_instance()

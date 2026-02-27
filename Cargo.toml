@@ -64,6 +64,22 @@ path = "examples/gcp/nat_gateway.rs"
 [[example]]
 name = "gcp_forwarding_rule"
 path = "examples/gcp/forwarding_rule.rs"
+[[example]]
+name = "gcp_backend_service"
+path = "examples/gcp/backend_service.rs"
+[[example]]
+name = "gcp_cloud_sql"
+path = "examples/gcp/cloud_sql.rs"
+[[example]]
+name = "gcp_bigquery_storage"
+path = "examples/gcp/bigquery_storage.rs"
+[[example]]
+name = "gcp_compute_instance"
+path = "examples/gcp/compute_instance.rs"
+[[example]]
+name = "gcp_blocking"
+path = "examples/gcp/blocking.rs"
+required-features = ["blocking"]
 
 # AWS examples
 [[example]]
@@ -93,6 +109,16 @@ path = "examples/aws/nat_gateway.rs"
 [[example]]
 name = "aws_alb"
 path = "examples/aws/alb.rs"
+[[example]]
+name = "aws_ec2_instance"
+path = "examples/aws/ec2_instance.rs"
+[[example]]
+name = "aws_rds"
+path = "examples/aws/rds.rs"
+[[example]]
+name = "aws_blocking"
+path = "examples/aws/blocking.rs"
+required-features = ["blocking"]
 
 # Azure examples
 [[example]]
@@ -110,6 +136,16 @@ path = "examples/azure/snapshot.rs"
 [[example]]
 name = "azure_public_ip"
 path = "examples/azure/public_ip.rs"
+[[example]]
+name = "azure_nat_gateway"
+path = "examples/azure/nat_gateway.rs"
+[[example]]
+name = "azure_load_balancer_rules"
+path = "examples/azure/load_balancer_rules.rs"
+[[example]]
+name = "azure_blocking"
+path = "examples/azure/blocking.rs"
+required-features = ["blocking"]
 
 [dependencies]
 # GraphQL

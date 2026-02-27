@@ -9,7 +9,7 @@ use std::env;
 fn get_test_client() -> Client {
     let api_key = env::var("INFRACOST_API_KEY")
         .expect("INFRACOST_API_KEY must be set to run integration tests");
-    Client::new(api_key)
+    Client::new(api_key).unwrap()
 }
 
 #[tokio::test]

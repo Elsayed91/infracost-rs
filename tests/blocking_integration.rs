@@ -1032,7 +1032,7 @@ fn test_blocking_api_key_override() {
     let api_key = std::env::var("INFRACOST_API_KEY").expect("INFRACOST_API_KEY must be set");
 
     // Create an anonymous client
-    let client = Client::anonymous();
+    let client = Client::anonymous().unwrap();
 
     // Override the API key for this request
     let result = client
@@ -1054,7 +1054,7 @@ fn test_blocking_api_key_override() {
 #[test]
 fn test_blocking_override_default_fallback() {
     // Create an anonymous client
-    let client = Client::anonymous();
+    let client = Client::anonymous().unwrap();
 
     // Override the default fallback price
     let result = client

@@ -9,7 +9,7 @@
 //! use infracost_rs::providers::aws::EbsType;
 //!
 //! # fn main() -> Result<(), infracost_rs::Error> {
-//! let client = Client::anonymous();
+//! let client = Client::anonymous()?;
 //!
 //! let price = client
 //!     .aws()
@@ -171,7 +171,7 @@ mod tests {
     /// Detailed assertions are in the async builder tests.
     #[test]
     fn test_blocking_aws_smoke() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
 
         // EBS builder - test all fetch methods
         let _ = client
@@ -264,7 +264,7 @@ mod tests {
     /// Verify blocking wrappers properly delegate complex builders.
     #[test]
     fn test_blocking_aws_complex_builder() {
-        let client = Client::anonymous();
+        let client = Client::anonymous().unwrap();
 
         // Test EBS with multiple parameters
         let result = client
