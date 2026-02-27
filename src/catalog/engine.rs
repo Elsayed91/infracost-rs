@@ -292,7 +292,10 @@ impl PricingEngine {
     ) -> Option<&'a crate::types::Product> {
         products.iter().find(|product| {
             // Check description-based filters
-            if pf.description_starts_with.is_some() || !pf.description_excludes.is_empty() {
+            if pf.description_starts_with.is_some()
+                || !pf.description_contains.is_empty()
+                || !pf.description_excludes.is_empty()
+            {
                 let desc = product.attribute("description").unwrap_or("");
 
                 if let Some(ref prefix) = pf.description_starts_with

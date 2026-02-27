@@ -2,17 +2,22 @@
 
 Rust client for the [Infracost](https://www.infracost.io/) Cloud Pricing API. Typed builders for AWS, GCP, and Azure resources with async/blocking support, offline defaults, and optional caching.
 
+## Extending with Agents
+
+If you want the most accurate pricing, then you need to go through a lot of shenanigans figuring out the correct attribtues and filters, etc.
+A number of skills have been added to facilitate this, simply use `/add-resource` and the agents will run a pipeline that includes experimentation, research and API writing as well as unit/integration testing.
+
 ## Install
 
 ```toml
 [dependencies]
-infracost-rs = "0.1"
+infracost-rs = "0.4"
 
 # With blocking API
-infracost-rs = { version = "0.1", features = ["blocking"] }
+infracost-rs = { version = "0.4", features = ["blocking"] }
 
 # With caching
-infracost-rs = { version = "0.1", features = ["cache-memory"] }
+infracost-rs = { version = "0.4", features = ["cache-memory"] }
 ```
 
 ```bash
@@ -133,7 +138,7 @@ let products = client.products().vendor("gcp").service("Compute Engine").fetch()
 Four backends available. All implement `PriceCache` trait (default TTL: 24h).
 
 ```toml
-infracost-rs = { version = "0.1", features = ["cache-memory"] }
+infracost-rs = { version = "0.4", features = ["cache-memory"] }
 # or: cache-redis, cache-sqlite, cache-postgres
 ```
 
